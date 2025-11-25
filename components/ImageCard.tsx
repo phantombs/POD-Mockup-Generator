@@ -31,7 +31,9 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, onRetry }) => {
         {image.loading ? (
           <div className="flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-            <span className="text-indigo-400 text-xs font-medium animate-pulse">Designing...</span>
+            <span className="text-indigo-400 text-xs font-medium animate-pulse">
+              {image.configId === 'design-asset' ? 'Designing...' : 'Mocking up...'}
+            </span>
           </div>
         ) : image.error ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
@@ -60,18 +62,27 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, onRetry }) => {
 
       {/* Footer / Actions */}
       <div className="p-4 border-t border-slate-700 bg-slate-800 flex justify-between items-center">
-        <span className="text-xs text-slate-400 font-medium truncate max-w-[60%]">
+        <span className="text-xs text-slate-400 font-medium truncate max-w-[50%]">
           {image.title}
         </span>
         
         {image.imageUrl && !image.loading && (
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onRetry(image.configId)}
+              className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-600"
+              title="Regenerate this image"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download
+            </button>
+          </div>
         )}
       </div>
     </div>
