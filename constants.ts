@@ -1,3 +1,4 @@
+
 import { MockupConfig } from './types';
 
 export const NICHES = [
@@ -25,32 +26,42 @@ export const DESIGN_STYLES = [
   { 
     id: 'auto', 
     label: '✨ Auto-Detect', 
-    context: 'Analyze the slogan and niche to determine the most commercially viable artistic style automatically.' 
+    context: 'Analyze the slogan and niche to determine the most commercially viable artistic style automatically based on current POD trends.' 
   },
   { 
-    id: 'minimalist', 
-    label: 'Minimalist Typography', 
-    context: 'Style: Clean, bold sans-serif fonts, negative space, high contrast. Focus on legibility and simple geometric shapes.' 
+    id: 'quiet-activism', 
+    label: 'Quiet Activism (Minimalist)', 
+    context: 'Style: Clean, bold sans-serif or typewriter fonts, significant negative space. Focus on legible, impactful text. High contrast, minimalist aesthetic common on TikTok/Pinterest.' 
   },
   { 
-    id: 'retro', 
-    label: 'Retro / Vintage (70s-90s)', 
-    context: 'Style: 70s/80s/90s aesthetic, distressed texture, cooper black fonts, slightly faded look for street wear.' 
+    id: 'ai-futuristic', 
+    label: 'AI / Futuristic Art', 
+    context: 'Style: Y2K tech nostalgia, metallic/chrome textures, glitch effects, neon highlights, liquid metal fonts, and futuristic cyber-core motifs.' 
   },
   { 
-    id: 'y2k', 
-    label: 'Y2K / Early 2000s', 
-    context: 'Style: Futuristic, chrome fonts, glitch effects, rave aesthetic, butterfly/star motifs.' 
+    id: 'nature-eco', 
+    label: 'Nature / Eco (Solar-Punk)', 
+    context: 'Style: Intricate botanical line art, mushrooms, celestial bodies, solar-punk influence, muted earthy palettes, and organic, sustainable vibes.' 
   },
   { 
-    id: 'hand-drawn', 
-    label: 'Artistic / Hand-Drawn', 
-    context: 'Style: Organic, doodle style, pencil texture, playful, human touch for personalized gifts.' 
+    id: 'fantasy-escapism', 
+    label: 'Fantasy / Escapism', 
+    context: 'Style: Ethereal lighting, dreamy landscapes, mythical creatures, vibrant magical colors, surreal compositions that evoke a sense of wonder.' 
   },
   { 
-    id: 'bold-graphic', 
-    label: 'Bold Streetwear', 
-    context: 'Style: Oversized graphics, flat design, pop-art influence, large shapes suitable for back-prints.' 
+    id: 'pixel-art', 
+    label: '8-Bit / Pixel Art', 
+    context: 'Style: Retro gaming arcade aesthetic, low-resolution pixelated graphics, bright 8-bit color palette, nostalgic 90s console vibes.' 
+  },
+  { 
+    id: 'quirky-diy', 
+    label: 'Quirky DIY (Hand-Drawn)', 
+    context: 'Style: Playful doodles, pencil/crayon textures, irregular lines, charmingly imperfect "human touch" designs popular for personalized gifts.' 
+  },
+  { 
+    id: 'color-blocking', 
+    label: 'Color-Blocking / Bold Graphics', 
+    context: 'Style: Large geometric shapes, high-contrast clashing colors, brutalist layout, pop-art influence, maximalist and eye-catching composition.' 
   }
 ];
 
@@ -71,7 +82,7 @@ export const DESIGN_ASSET_CONFIG: MockupConfig = {
     Art Style: ${style.artStyle}. 
     Colors: ${style.colors}. 
     Mood: ${style.mood}.
-    Technical Constraint: SOLID WHITE BACKGROUND ONLY. NO GRADIENTS on background. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style.`;
+    Technical Constraint: SOLID WHITE BACKGROUND ONLY. NO GRADIENTS on background. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style suitable for direct-to-garment (DTG) printing.`;
   }
 };
 
@@ -91,8 +102,44 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
     }
   },
   {
+    id: 'phonecase-mockup',
+    title: '3. Premium Phone Case',
+    description: 'Sleek impact-resistant phone case.',
+    template: (slogan, strategy) => {
+      const ctx = strategy?.mockups?.phoneCase || {
+        surface: "Modern glass desk",
+        props: "A cup of coffee and a notebook"
+      };
+      return `A high-end studio shot of a premium glossy phone case featuring the design from the reference (quote: "${slogan}"). Surface: ${ctx.surface}. Props: ${ctx.props}. Dramatic soft lighting, Apple-style aesthetic.`;
+    }
+  },
+  {
+    id: 'poster-mockup',
+    title: '4. Framed Wall Art',
+    description: 'Minimalist framed poster for home decor.',
+    template: (slogan, strategy) => {
+      const ctx = strategy?.mockups?.poster || {
+        room: "Scandinavian living room",
+        style: "Minimalist black frame"
+      };
+      return `A lifestyle photo of a large framed vertical poster on a wall. The poster shows the design from the reference (quote: "${slogan}"). Room: ${ctx.room}. Frame Style: ${ctx.style}. Natural light coming from a window.`;
+    }
+  },
+  {
+    id: 'cap-mockup',
+    title: '5. Embroidered Cap',
+    description: 'Classic baseball cap with embroidered logo.',
+    template: (slogan, strategy) => {
+      const ctx = strategy?.mockups?.cap || {
+        style: "Vintage dad hat",
+        setting: "Outdoor park bench"
+      };
+      return `Close-up shot of a high-quality cotton baseball cap featuring the design from the reference as an embroidered patch (quote: "${slogan}"). Style: ${ctx.style}. Setting: ${ctx.setting}. Focus on embroidery texture and stitching.`;
+    }
+  },
+  {
     id: 'mug-mockup',
-    title: '3. Desk/Home Mug',
+    title: '6. Desk/Home Mug',
     description: '11oz ceramic mug in a cozy setting.',
     template: (slogan, strategy) => {
       const ctx = strategy?.mockups?.mug || {
@@ -104,15 +151,27 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
   },
   {
     id: 'sticker-mockup',
-    title: '4. Laptop Sticker',
+    title: '7. Laptop Sticker',
     description: 'Vinyl die-cut sticker on a laptop.',
     template: (slogan, strategy) => {
       return `Close-up shot of a high-quality vinyl sticker on a modern silver laptop. The sticker shows the design from the reference (quote: "${slogan}"). Clean white border around the sticker (die-cut).`;
     }
   },
   {
+    id: 'pillow-mockup',
+    title: '8. Accent Throw Pillow',
+    description: 'Square decorative pillow for sofas.',
+    template: (slogan, strategy) => {
+      const ctx = strategy?.mockups?.pillow || {
+        setting: "Velvet navy sofa",
+        colors: "Cozy warm tones"
+      };
+      return `A lifestyle interior photo of a square throw pillow featuring the design from the reference (quote: "${slogan}"). Setting: ${ctx.setting}. Lighting: Warm and cozy. Professional interior design photography.`;
+    }
+  },
+  {
     id: 'tote-mockup',
-    title: '5. Canvas Tote Bag',
+    title: '9. Canvas Tote Bag',
     description: 'Eco-friendly tote bag mockup.',
     template: (slogan, strategy) => {
       return `A lifestyle photo of an eco-friendly beige canvas tote bag with the design from the reference image (quote: "${slogan}"). The bag is hanging on a wooden hook. Aesthetic: Sustainable, organic.`;
@@ -120,10 +179,18 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
   },
   {
     id: 'hoodie-mockup',
-    title: '6. Premium Hoodie',
+    title: '10. Premium Hoodie',
     description: 'Design on a cozy streetwear hoodie.',
     template: (slogan, strategy) => {
       return `Streetwear style photo of a cozy black hoodie with a large print on the back featuring the design from the reference (quote: "${slogan}"). Atmospheric lighting, urban vibes.`;
+    }
+  },
+  {
+    id: 'wallpaper-mockup',
+    title: '11. Digital Wallpaper',
+    description: 'Smartphone wallpaper preview.',
+    template: (slogan, strategy) => {
+      return `A vertical high-resolution digital wallpaper design for a smartphone. The design is based on the reference (quote: "${slogan}"). Minimalist composition, optimized for mobile screens.`;
     }
   }
 ];

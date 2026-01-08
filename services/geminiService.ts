@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { DesignStrategy } from "../types";
 
@@ -76,6 +77,27 @@ export const generateDesignStrategy = async (
                     props: { type: Type.STRING },
                   }
                 },
+                poster: {
+                  type: Type.OBJECT,
+                  properties: {
+                    room: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                  }
+                },
+                cap: {
+                  type: Type.OBJECT,
+                  properties: {
+                    style: { type: Type.STRING },
+                    setting: { type: Type.STRING },
+                  }
+                },
+                pillow: {
+                  type: Type.OBJECT,
+                  properties: {
+                    setting: { type: Type.STRING },
+                    colors: { type: Type.STRING },
+                  }
+                },
                 composite: {
                   type: Type.OBJECT,
                   properties: {
@@ -103,6 +125,9 @@ export const generateDesignStrategy = async (
         mug: { setting: "Table", props: "None" },
         sticker: { surface: "Laptop", lighting: "Natural" },
         phoneCase: { surface: "Desk", props: "None" },
+        poster: { room: "Living Room", style: "Black Frame" },
+        cap: { style: "Baseball Cap", setting: "Street" },
+        pillow: { setting: "Sofa", colors: "Matching" },
         composite: { arrangement: "Flat-lay", theme: "Unified" }
       }
     };

@@ -1,3 +1,4 @@
+
 export interface DesignStrategy {
   designStyle: {
     typography: string;
@@ -10,6 +11,9 @@ export interface DesignStrategy {
     mug: { setting: string; props: string };
     sticker: { surface: string; lighting: string };
     phoneCase: { surface: string; props: string };
+    poster: { room: string; style: string };
+    cap: { style: string; setting: string };
+    pillow: { setting: string; colors: string };
     composite: { arrangement: string; theme: string };
   };
 }
