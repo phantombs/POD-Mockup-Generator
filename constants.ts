@@ -12,73 +12,52 @@ export const NICHES = [
   { id: 'custom', label: 'Custom / Other (Type your own)' },
 ];
 
+export const COLOR_PALETTES = [
+  { id: 'vibrant', label: 'Vibrant & Bold', colors: ['#FF0000', '#00FF00', '#0000FF'], context: 'High saturation, high energy, popping colors for maximum visibility.' },
+  { id: 'pastel', label: 'Soft Pastel', colors: ['#FFB7B2', '#B2E2F2', '#E2F2B2'], context: 'Soft, gentle, trendy aesthetics for feminine or cute niches.' },
+  { id: 'retro', label: 'Vintage 70s', colors: ['#E9C46A', '#F4A261', '#E76F51'], context: 'Warm yellows, burnt oranges, and deep teals for a nostalgic feel.' },
+  { id: 'earth', label: 'Earth Tones', colors: ['#6B705C', '#A5A58D', '#B7B7A4'], context: 'Natural greens, browns, and muted tans for outdoor and adventure gear.' },
+  { id: 'monochrome', label: 'Black & White', colors: ['#000000', '#FFFFFF', '#808080'], context: 'High contrast black and white. Timeless, minimalist, and easy to print.' },
+  { id: 'neon', label: 'Cyber Neon', colors: ['#00F5FF', '#FF00E5', '#39FF14'], context: 'Electric blues, magentas, and lime greens for gaming and futuristic vibes.' },
+];
+
 export const DESIGN_STYLES = [
   { 
     id: 'auto', 
-    label: '✨ Auto-Detect (Let AI Choose)', 
+    label: '✨ Auto-Detect', 
     context: 'Analyze the slogan and niche to determine the most commercially viable artistic style automatically.' 
   },
   { 
     id: 'minimalist', 
     label: 'Minimalist Typography', 
-    context: 'Style: Clean, bold sans-serif fonts, negative space, high contrast black/white or monochrome. Focus on legibility and simple geometric shapes.' 
+    context: 'Style: Clean, bold sans-serif fonts, negative space, high contrast. Focus on legibility and simple geometric shapes.' 
   },
   { 
     id: 'retro', 
     label: 'Retro / Vintage (70s-90s)', 
-    context: 'Style: 70s/80s/90s aesthetic, distressed texture (grunge), warm sunset colors, serif or cooper black fonts, cassette/vinyl motifs, slightly faded look.' 
+    context: 'Style: 70s/80s/90s aesthetic, distressed texture, cooper black fonts, slightly faded look for street wear.' 
   },
   { 
     id: 'y2k', 
     label: 'Y2K / Early 2000s', 
-    context: 'Style: Early 2000s futuristic, chrome/metallic fonts, neon pinks and blues, glitch effects, tribal tattoos, digital grids, rave aesthetic.' 
-  },
-  { 
-    id: 'futuristic', 
-    label: 'AI / Futuristic / Cyberpunk', 
-    context: 'Style: Abstract digital art, neon lights, dystopian vibes, surrealism, high-tech interface elements, glossy finishes.' 
+    context: 'Style: Futuristic, chrome fonts, glitch effects, rave aesthetic, butterfly/star motifs.' 
   },
   { 
     id: 'hand-drawn', 
-    label: 'Hand-Drawn / Sketchy', 
-    context: 'Style: Organic imperfections, doodle style, pencil or charcoal texture, playful scribbles, unfinished lines, human touch.' 
-  },
-  { 
-    id: 'brutalist', 
-    label: 'Anti-Design / Brutalist', 
-    context: 'Style: Chaotic layout, raw typography, clashing colors, pixelated elements, lo-fi aesthetic, MS Paint style, ironic and edgy.' 
-  },
-  { 
-    id: 'fake-brand', 
-    label: 'Nostalgia / Fake Brand', 
-    context: 'Style: Logo-style design, crests, badges, corporate mascots, established date typography, varsity/collegiate lettering.' 
-  },
-  { 
-    id: 'nature', 
-    label: 'Nature / Eco / Solarpunk', 
-    context: 'Style: Earth tones (greens, browns), botanical illustrations, sustainable vibes, soft organic shapes, cottagecore or solarpunk aesthetic.' 
+    label: 'Artistic / Hand-Drawn', 
+    context: 'Style: Organic, doodle style, pencil texture, playful, human touch for personalized gifts.' 
   },
   { 
     id: 'bold-graphic', 
-    label: 'Color-Blocking / Bold Graphic', 
-    context: 'Style: Oversized graphics, flat design with no gradients, bright contrasting colors, pop-art influence, large shapes.' 
-  },
-  { 
-    id: 'pixel-art', 
-    label: '8-Bit / Pixel Art', 
-    context: 'Style: Retro video game aesthetic, blocky pixels, limited color palette, arcade vibes.' 
-  },
-  { 
-    id: 'kawaii', 
-    label: 'Quirky / Kawaii DIY', 
-    context: 'Style: Cute characters, pastel colors, sticker-bomb aesthetic, patches, playful icons, soft rounded fonts.' 
+    label: 'Bold Streetwear', 
+    context: 'Style: Oversized graphics, flat design, pop-art influence, large shapes suitable for back-prints.' 
   }
 ];
 
 export const DESIGN_ASSET_CONFIG: MockupConfig = {
   id: 'design-asset',
-  title: '1. Design Asset (Vector Style)',
-  description: 'Minimalist typography and graphic design suitable for screen printing.',
+  title: '1. Design Asset (Print-Ready)',
+  description: 'Clean vector-style graphic optimized for T-shirt printing.',
   template: (slogan, strategy) => {
     const style = strategy?.designStyle || {
       typography: "Bold, modern typography",
@@ -87,80 +66,64 @@ export const DESIGN_ASSET_CONFIG: MockupConfig = {
       mood: "Modern"
     };
     
-    return `Graphic design featuring the quote "${slogan}". 
+    return `Create a high-quality POD design asset for: "${slogan}".
     Typography: ${style.typography}. 
     Art Style: ${style.artStyle}. 
     Colors: ${style.colors}. 
     Mood: ${style.mood}.
-    Constraint: The design MUST be on a plain, solid white background. The graphic must be isolated and centered. High resolution, clean lines, suitable for screen printing. Aspect Ratio: Square (1:1).`;
+    Technical Constraint: SOLID WHITE BACKGROUND ONLY. NO GRADIENTS on background. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style.`;
   }
 };
 
 export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
   {
     id: 'tshirt-mockup',
-    title: '2. T-Shirt Mockup',
-    description: 'Lifestyle photo of a model wearing the design.',
+    title: '2. Lifestyle T-Shirt',
+    description: 'Design on a premium heavy cotton t-shirt.',
     template: (slogan, strategy) => {
       const ctx = strategy?.mockups?.tshirt || {
-        model: "A diverse, attractive model",
-        environment: "soft, sunlit urban environment",
-        lighting: "Natural lighting"
+        model: "A stylish young adult",
+        environment: "Urban street background",
+        lighting: "Golden hour lighting"
       };
       
-      return `A stylish lifestyle photo of a modern t-shirt mockup in a dark color (e.g., black or navy). The t-shirt features the exact design from the reference image provided (quote: "${slogan}"). Model: ${ctx.model}. Environment: ${ctx.environment}. Lighting: ${ctx.lighting}. Focus on the detail and texture of the fabric. Photography style: Product photography, Depth of Field.`;
+      return `Professional product photography of a premium t-shirt featuring the design from the reference image (quote: "${slogan}"). Model: ${ctx.model}. Environment: ${ctx.environment}. Lighting: ${ctx.lighting}. The t-shirt is the focus, high detail on fabric texture.`;
     }
   },
   {
     id: 'mug-mockup',
-    title: '3. Coffee Mug Mockup',
-    description: 'Ceramic mug shot in a themed setting.',
+    title: '3. Desk/Home Mug',
+    description: '11oz ceramic mug in a cozy setting.',
     template: (slogan, strategy) => {
       const ctx = strategy?.mockups?.mug || {
-        setting: "simple wooden desk next to a laptop",
-        props: "green plant"
+        setting: "Modern minimalist kitchen",
+        props: "Steam rising from the mug"
       };
-
-      return `High-quality studio shot of a classic white ceramic coffee mug, prominently displaying the graphic from the reference image (quote: "${slogan}"). Setting: ${ctx.setting}. Props: ${ctx.props}. Soft, focused light highlights the mug. Aesthetic: Clean, professional, commercial product photography.`;
+      return `A high-end studio shot of a white ceramic mug displaying the graphic from the reference (quote: "${slogan}"). Setting: ${ctx.setting}. Props: ${ctx.props}. 8k resolution, commercial look.`;
     }
   },
   {
     id: 'sticker-mockup',
-    title: '4. Sticker Mockup',
-    description: 'Die-cut vinyl sticker on a relevant surface.',
+    title: '4. Laptop Sticker',
+    description: 'Vinyl die-cut sticker on a laptop.',
     template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.sticker || {
-        surface: "weathered, matte black motorcycle helmet",
-        lighting: "Harsh, directional light"
-      };
-
-      return `Close-up, detailed photo of a durable vinyl sticker applied to a ${ctx.surface}. The sticker features the design from the reference image (quote: "${slogan}"). Show the slight curvature and texture of the sticker edge. Lighting: ${ctx.lighting}.`;
+      return `Close-up shot of a high-quality vinyl sticker on a modern silver laptop. The sticker shows the design from the reference (quote: "${slogan}"). Clean white border around the sticker (die-cut).`;
     }
   },
   {
-    id: 'phone-case-mockup',
-    title: '5. Phone Case Mockup',
-    description: 'Clear case on a modern smartphone.',
+    id: 'tote-mockup',
+    title: '5. Canvas Tote Bag',
+    description: 'Eco-friendly tote bag mockup.',
     template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.phoneCase || {
-        surface: "minimalist concrete or marble surface",
-        props: "stylish sunglasses"
-      };
-
-      return `A clean flat lay photo of a modern smartphone with a clear phone case mockup. The case features the design from the reference image (quote: "${slogan}"). Surface: ${ctx.surface}. Props adjacent to phone: ${ctx.props}. Color Palette: Neutral and muted.`;
+      return `A lifestyle photo of an eco-friendly beige canvas tote bag with the design from the reference image (quote: "${slogan}"). The bag is hanging on a wooden hook. Aesthetic: Sustainable, organic.`;
     }
   },
   {
-    id: 'composite-mockup',
-    title: '6. Brand Composite',
-    description: 'Collection of products displayed together.',
+    id: 'hoodie-mockup',
+    title: '6. Premium Hoodie',
+    description: 'Design on a cozy streetwear hoodie.',
     template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.composite || {
-        arrangement: "flat-lay or shelf display",
-        theme: "Unified color theme, premium lifestyle branding"
-      };
-
-      return `A cohesive, aesthetically pleasing ${ctx.arrangement} showing a T-shirt (folded neatly), a Coffee Mug, and a Sticker. All items feature the design from the reference image (quote: "${slogan}"). Aesthetic: ${ctx.theme}.`;
+      return `Streetwear style photo of a cozy black hoodie with a large print on the back featuring the design from the reference (quote: "${slogan}"). Atmospheric lighting, urban vibes.`;
     }
   }
 ];

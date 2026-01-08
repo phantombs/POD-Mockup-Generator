@@ -1,34 +1,33 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DesignStrategy } from "../types";
 
-// Ensure API key is present
 if (!process.env.API_KEY) {
   console.error("Missing API_KEY in environment variables.");
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * Analyzes the slogan and niche to create a design and mockup strategy.
- * Now accepts a 'styleContext' to enforce specific design trends.
- */
-export const generateDesignStrategy = async (slogan: string, niche: string, styleContext: string): Promise<DesignStrategy> => {
+export const generateDesignStrategy = async (
+  slogan: string, 
+  niche: string, 
+  styleContext: string,
+  targetAudience: string,
+  colorContext: string
+): Promise<DesignStrategy> => {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Analyze this slogan: "${slogan}" for the Print-on-Demand niche: "${niche}".
+      model: 'gemini-3-pro-preview',
+      contents: `You are a world-class Print-on-Demand (POD) Strategist. 
+      Analyze the slogan: "${slogan}" for the niche: "${niche}".
+      Target Audience: ${targetAudience || 'General public'}.
+      Required Style: ${styleContext}.
+      Required Color Palette: ${colorContext}.
       
-      MANDATORY DESIGN CONSTRAINT: The visual style MUST adhere to: "${styleContext}".
+      Goal: Create a design strategy that is commercially viral on platforms like Redbubble, Etsy, and Amazon Merch.
       
-      Create a visual design strategy for a vector graphic and 5 product mockups.
-      
-      1. Design Style: Define the typography, art style, colors, and mood based on the mandatory design constraint above.
-      2. Mockups: Define the visual context for each product to match the niche.
-         - T-Shirt: Model description (age, style), environment (gym, office, park), lighting.
-         - Mug: Setting (desk, camping table, kitchen), props.
-         - Sticker: Surface (laptop, helmet, water bottle, lamp post), lighting.
-         - Phone Case: Surface type, props (keys, wallet, makeup).
-         - Composite: Arrangement style, overall theme.
+      Requirements:
+      1. Design Style: Define typography that is legible and trendy. Suggest an art style that fits the audience. Use the color palette provided.
+      2. Mockups: Suggest environments where the target audience would actually use these products.
       `,
       config: {
         responseMimeType: "application/json",
@@ -42,7 +41,8 @@ export const generateDesignStrategy = async (slogan: string, niche: string, styl
                 artStyle: { type: Type.STRING },
                 colors: { type: Type.STRING },
                 mood: { type: Type.STRING },
-              }
+              },
+              required: ["typography", "artStyle", "colors", "mood"]
             },
             mockups: {
               type: Type.OBJECT,
@@ -96,32 +96,23 @@ export const generateDesignStrategy = async (slogan: string, niche: string, styl
     throw new Error("No strategy generated");
   } catch (error) {
     console.error("Error generating strategy:", error);
-    // Return a safe fallback if AI fails
     return {
-      designStyle: { typography: "Bold Sans-serif", artStyle: "Minimalist", colors: "Black and White", mood: "Modern" },
+      designStyle: { typography: "Bold Sans-serif", artStyle: "Minimalist", colors: "Modern Palette", mood: "Professional" },
       mockups: {
-        tshirt: { model: "Young adult", environment: "Studio background", lighting: "Soft studio light" },
-        mug: { setting: "Wooden table", props: "None" },
-        sticker: { surface: "Laptop lid", lighting: "Daylight" },
-        phoneCase: { surface: "White table", props: "None" },
-        composite: { arrangement: "Grid layout", theme: "Clean" }
+        tshirt: { model: "Model", environment: "Studio", lighting: "Soft" },
+        mug: { setting: "Table", props: "None" },
+        sticker: { surface: "Laptop", lighting: "Natural" },
+        phoneCase: { surface: "Desk", props: "None" },
+        composite: { arrangement: "Flat-lay", theme: "Unified" }
       }
     };
   }
 };
 
-/**
- * Generates an image using the Gemini 2.5 Flash Image model.
- * @param prompt The prompt to send to the model.
- * @param referenceImageBase64 Optional base64 string of an image to use as reference/input.
- * @returns A base64 string of the image.
- */
 export const generateMockupImage = async (prompt: string, referenceImageBase64?: string | null): Promise<string> => {
   try {
     const parts: any[] = [{ text: prompt }];
-
     if (referenceImageBase64) {
-      // Clean base64 string if it contains data prefix
       const base64Data = referenceImageBase64.replace(/^data:image\/\w+;base64,/, "");
       parts.push({
         inlineData: {
@@ -133,40 +124,19 @@ export const generateMockupImage = async (prompt: string, referenceImageBase64?:
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: parts
-      },
+      contents: { parts: parts },
       config: {
-        imageConfig: {
-            aspectRatio: "1:1",
-            // imageSize is only for Pro models, Flash Image generates 1024x1024 by default
-        }
+        imageConfig: { aspectRatio: "1:1" }
       }
     });
 
-    // Extract image data
     const candidates = response.candidates;
-    if (!candidates || candidates.length === 0) {
-      throw new Error("No candidates returned from Gemini API.");
-    }
+    if (!candidates || candidates.length === 0) throw new Error("No image generated.");
+    
+    const imagePart = candidates[0].content.parts.find(p => p.inlineData);
+    if (!imagePart?.inlineData?.data) throw new Error("Missing image data.");
 
-    const responseParts = candidates[0].content.parts;
-    let base64Image: string | null = null;
-
-    for (const part of responseParts) {
-      if (part.inlineData && part.inlineData.data) {
-        base64Image = part.inlineData.data;
-        break;
-      }
-    }
-
-    if (!base64Image) {
-      throw new Error("No image data found in the response.");
-    }
-
-    // Convert raw base64 to data URL
-    return `data:image/png;base64,${base64Image}`;
-
+    return `data:image/png;base64,${imagePart.inlineData.data}`;
   } catch (error) {
     console.error("Error generating image:", error);
     throw error;
