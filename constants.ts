@@ -1,4 +1,3 @@
-
 import { MockupConfig } from './types';
 
 export const NICHES = [
@@ -139,7 +138,7 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
   },
   {
     id: 'mug-mockup',
-    title: '6. Desk/Home Mug',
+    title: '6. Desk & Home Mug',
     description: '11oz ceramic mug in a cozy setting.',
     template: (slogan, strategy) => {
       const ctx = strategy?.mockups?.mug || {

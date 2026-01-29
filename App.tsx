@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import JSZip from 'jszip';
-import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES } from './constants';
+import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES, ALL_CONFIGS } from './constants';
 import { GeneratedImage, GenerationStatus, DesignStrategy } from './types';
-import { generateMockupImage, generateDesignStrategy, generatePromoVideo } from './services/geminiService';
+import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt } from './services/geminiService';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ImageCard from './components/ImageCard';
-import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X } from 'lucide-react';
 
 const App: React.FC = () => {
   const [images, setImages] = useState<GeneratedImage[]>(INITIAL_IMAGES);
@@ -21,6 +21,11 @@ const App: React.FC = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
+  
+  const [videoPrompt, setVideoPrompt] = useState<string | null>(null);
+  const [isVideoPromptGenerating, setIsVideoPromptGenerating] = useState(false);
+  const [isVideoPromptModalOpen, setIsVideoPromptModalOpen] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
 
   useEffect(() => {
     const checkKey = async () => {
@@ -39,6 +44,9 @@ const App: React.FC = () => {
     setVideoUrl(null);
     setIsVideoGenerating(false);
     setVideoError(null);
+    setVideoPrompt(null);
+    setIsVideoPromptGenerating(false);
+    setIsVideoPromptModalOpen(false);
   };
 
   const handleOpenKeySelector = async () => {
@@ -162,6 +170,30 @@ const App: React.FC = () => {
     }
   };
 
+  const handleGenerateVideoPrompt = async () => {
+    if (!designStrategy || !currentSlogan || !currentNiche) return;
+    setIsVideoPromptGenerating(true);
+    setVideoPrompt(null);
+    try {
+      const prompt = await generateVideoPrompt(currentSlogan, currentNiche, currentAudience, designStrategy);
+      setVideoPrompt(prompt);
+      setIsVideoPromptModalOpen(true);
+    } catch(e) {
+      // Simple error handling for prompt generation
+      alert("Sorry, the AI Director is busy. Please try again in a moment.");
+    } finally {
+      setIsVideoPromptGenerating(false);
+    }
+  };
+
+  const handleCopyPrompt = () => {
+    if (videoPrompt) {
+      navigator.clipboard.writeText(videoPrompt);
+      setHasCopied(true);
+      setTimeout(() => setHasCopied(false), 2000);
+    }
+  };
+
   useEffect(() => {
     const isMockupsLoading = images.filter(i => i.configId !== DESIGN_ASSET_CONFIG.id).some(img => img.loading);
     if (!isMockupsLoading && status === GenerationStatus.GENERATING_MOCKUPS) {
@@ -188,9 +220,19 @@ const App: React.FC = () => {
     const zip = new JSZip();
     const folder = zip.folder(`pod-assets-${Date.now()}`);
     if (folder) {
-      images.forEach(img => {
+      const sortedImages = [...images].sort((a, b) => {
+        const indexA = ALL_CONFIGS.findIndex(c => c.id === a.configId);
+        const indexB = ALL_CONFIGS.findIndex(c => c.id === b.configId);
+        return indexA - indexB;
+      });
+
+      sortedImages.forEach(img => {
         if (img.imageUrl) {
-          folder.file(`${img.title.replace(/\s/g, '_')}.png`, img.imageUrl.split(',')[1], { base64: true });
+          const sanitizedTitle = img.title
+            .replace(/\s/g, '_')
+            .replace(/[&/]/g, '-')
+            .replace(/[()]/g, '');
+          folder.file(`${sanitizedTitle}.png`, img.imageUrl.split(',')[1], { base64: true });
         }
       });
       if (videoUrl) {
@@ -370,6 +412,14 @@ const App: React.FC = () => {
                 {status === GenerationStatus.COMPLETED && (
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button 
+                      onClick={handleGenerateVideoPrompt}
+                      disabled={isVideoPromptGenerating}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-700/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {isVideoPromptGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
+                      Generate Video Script
+                    </button>
+                    <button 
                         onClick={handleGenerateVideo}
                         disabled={!hasApiKey || isVideoGenerating}
                         className="flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
@@ -437,6 +487,34 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {isVideoPromptModalOpen && videoPrompt && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl flex flex-col">
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+              <div className='flex items-center gap-2'>
+                <FileText className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-lg font-bold text-white">AI Video Director Script</h3>
+              </div>
+              <button onClick={() => setIsVideoPromptModalOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <pre className="p-6 text-sm text-slate-300 overflow-y-auto max-h-[60vh] whitespace-pre-wrap font-sans bg-slate-900/50">
+              {videoPrompt}
+            </pre>
+            <div className="p-4 border-t border-slate-700 flex justify-end">
+                <button 
+                  onClick={handleCopyPrompt}
+                  className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-indigo-500/30"
+                >
+                  <Clipboard className="w-4 h-4" />
+                  {hasCopied ? 'Copied!' : 'Copy Script'}
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

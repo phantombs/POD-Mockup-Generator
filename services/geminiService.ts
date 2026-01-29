@@ -152,3 +152,53 @@ export const generatePromoVideo = async (slogan: string, strategy: DesignStrateg
     throw error;
   }
 };
+
+export const generateVideoPrompt = async (
+  slogan: string,
+  niche: string,
+  targetAudience: string,
+  strategy: DesignStrategy,
+): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `
+        You are a creative director specializing in viral social media ads for e-commerce brands.
+        Your task is to create a detailed video script and shot list for a 15-second promotional video, suitable for TikTok, Instagram Reels, and YouTube Shorts.
+
+        The product is a new merchandise line based on the slogan: "${slogan}".
+
+        **Brand & Design DNA:**
+        - **Target Audience:** ${targetAudience || 'General public'}
+        - **Niche:** ${niche}
+        - **Overall Mood:** ${strategy.designStyle.mood}
+        - **Art Style:** ${strategy.designStyle.artStyle}
+        - **Color Palette:** ${strategy.designStyle.colors}
+
+        **Available Visual Assets:**
+        The video will feature dynamic shots of the following products, each bearing the slogan design:
+        1. Lifestyle T-Shirt & Hoodie
+        2. Sleek Phone Case
+        3. Framed Wall Art
+        4. Embroidered Cap
+        5. Ceramic Mug & Laptop Sticker
+
+        **Requirements for the script:**
+        - **Structure:** Provide a scene-by-scene breakdown (e.g., ### Scene 1).
+        - **Timestamps:** Suggest approximate timings for each scene (e.g., 0-3s).
+        - **Visuals:** Describe the camera shot (e.g., "Fast-paced montage," "Close-up on embroidery detail," "Slow-motion shot of coffee pouring into the mug").
+        - **On-Screen Text:** Suggest any text overlays that should appear. The main slogan should be featured prominently.
+        - **Audio:** Suggest a style of trending audio or music (e.g., "Upbeat lo-fi hip hop," "Cinematic synthwave"). Also, suggest any sound effects (e.g., "*whoosh*," "*click*").
+        - **Output Format:** Use Markdown for clear formatting with headings for each scene. The final output should be a complete, ready-to-use prompt that another person could use to create the video.
+      `,
+    });
+    if (response.text) {
+      return response.text;
+    }
+    throw new Error("No video prompt generated");
+  } catch (error) {
+    console.error("Error generating video prompt:", error);
+    throw error;
+  }
+};
