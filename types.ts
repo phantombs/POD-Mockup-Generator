@@ -15,6 +15,7 @@ export interface DesignStrategy {
     cap: { style: string; setting: string };
     pillow: { setting: string; colors: string };
     composite: { arrangement: string; theme: string };
+    video: { music: string; style: string; transitions: string };
   };
 }
 

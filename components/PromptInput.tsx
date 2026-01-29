@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, Loader2, Sparkles, PenTool, Paintbrush, Users, Palette } from 'lucide-react';
+import { Wand2, Loader2, Sparkles, PenTool, Paintbrush, Users, Palette, BrainCircuit, Film } from 'lucide-react';
 import { NICHES, DESIGN_STYLES, COLOR_PALETTES } from '../constants';
 
 interface PromptInputProps {
@@ -160,13 +160,13 @@ const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerating, sta
           )}
         </button>
       </form>
-      <div className="text-center mt-4 text-slate-500 text-xs flex items-center justify-center gap-4">
+      <div className="text-center mt-4 text-slate-500 text-xs flex items-center justify-center gap-3">
         <span className="flex items-center gap-1"><BrainCircuit className="w-3 h-3" /> Strategy: Gemini 3 Pro</span>
-        <span className="flex items-center gap-1"><Palette className="w-3 h-3" /> Image: Gemini 2.5 Flash Image</span>
+        <span className="flex items-center gap-1"><Palette className="w-3 h-3" /> Image: Gemini Flash Image</span>
+        <span className="flex items-center gap-1"><Film className="w-3 h-3" /> Video: Veo</span>
       </div>
     </div>
   );
 };
 
 export default PromptInput;
-import { BrainCircuit } from 'lucide-react';

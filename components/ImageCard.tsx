@@ -38,7 +38,7 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, onRetry }) => {
         ) : image.error ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
             <AlertCircle className="w-10 h-10 text-rose-500 mb-2" />
-            <p className="text-rose-200 text-sm mb-4">{image.error}</p>
+            <p className="text-rose-200 text-sm mb-4 break-words">{image.error}</p>
             <button
               onClick={() => onRetry(image.configId)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-white transition-colors"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Palette, ShoppingBag } from 'lucide-react';
+import { Palette, ShoppingBag, Sparkles } from 'lucide-react';
 
 const Header: React.FC = () => {
   return (
@@ -15,9 +15,12 @@ const Header: React.FC = () => {
       <h1 className="text-4xl font-extrabold text-white tracking-tight sm:text-5xl">
         POD <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-rose-400">Mockup Studio</span>
       </h1>
-      <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-400">
-        Enter your slogan, and we'll generate 6 professional mockups ready for your Redbubble or Printful store.
-      </p>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+        <p className="max-w-2xl text-lg text-slate-400">
+          Pro-Grade AI Design Engine for Print-on-Demand.
+        </p>
+      </div>
     </div>
   );
 };
