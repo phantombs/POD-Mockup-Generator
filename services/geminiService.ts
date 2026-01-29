@@ -158,41 +158,44 @@ export const generateVideoPrompt = async (
   niche: string,
   targetAudience: string,
   strategy: DesignStrategy,
+  imageUrls: string[]
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `
+    const textPart = {
+      text: `
         You are a creative director specializing in viral social media ads for e-commerce brands.
-        Your task is to create a detailed video script and shot list for a 15-second promotional video, suitable for TikTok, Instagram Reels, and YouTube Shorts.
+        Your task is to create a detailed video script and shot list for a 15-second promotional video, based on the provided product mockup images. This script will be used as a prompt for another video generation AI.
 
-        The product is a new merchandise line based on the slogan: "${slogan}".
+        **Analyze the provided images and follow these instructions:**
 
         **Brand & Design DNA:**
+        - **Slogan:** "${slogan}"
         - **Target Audience:** ${targetAudience || 'General public'}
         - **Niche:** ${niche}
         - **Overall Mood:** ${strategy.designStyle.mood}
-        - **Art Style:** ${strategy.designStyle.artStyle}
-        - **Color Palette:** ${strategy.designStyle.colors}
-
-        **Available Visual Assets:**
-        The video will feature dynamic shots of the following products, each bearing the slogan design:
-        1. Lifestyle T-Shirt & Hoodie
-        2. Sleek Phone Case
-        3. Framed Wall Art
-        4. Embroidered Cap
-        5. Ceramic Mug & Laptop Sticker
+        - **Art Style & Colors:** Your description must reflect the visual style and colors present in the attached images.
 
         **Requirements for the script:**
         - **Structure:** Provide a scene-by-scene breakdown (e.g., ### Scene 1).
         - **Timestamps:** Suggest approximate timings for each scene (e.g., 0-3s).
-        - **Visuals:** Describe the camera shot (e.g., "Fast-paced montage," "Close-up on embroidery detail," "Slow-motion shot of coffee pouring into the mug").
-        - **On-Screen Text:** Suggest any text overlays that should appear. The main slogan should be featured prominently.
-        - **Audio:** Suggest a style of trending audio or music (e.g., "Upbeat lo-fi hip hop," "Cinematic synthwave"). Also, suggest any sound effects (e.g., "*whoosh*," "*click*").
-        - **Output Format:** Use Markdown for clear formatting with headings for each scene. The final output should be a complete, ready-to-use prompt that another person could use to create the video.
-      `,
+        - **Visuals:** Describe the camera shot and action for each scene. **Crucially, your descriptions must be based on the content of the provided mockup images.** For example, instead of "a person wearing a t-shirt", describe the scene from the image: "A stylish young man in a bustling city street, golden hour lighting highlighting the texture of the black t-shirt."
+        - **On-Screen Text:** Suggest any text overlays. The main slogan should be featured prominently.
+        - **Audio:** Suggest a style of trending audio/music and sound effects (e.g., "*whoosh*," "*click*").
+        - **Output Format:** Use Markdown for clear formatting. The final output should be a complete, ready-to-use prompt.
+      `
+    };
+
+    const imageParts = imageUrls.map(url => {
+      const base64Data = url.replace(/^data:image\/\w+;base64,/, "");
+      return { inlineData: { mimeType: 'image/png', data: base64Data } };
     });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: { parts: [textPart, ...imageParts] },
+    });
+
     if (response.text) {
       return response.text;
     }

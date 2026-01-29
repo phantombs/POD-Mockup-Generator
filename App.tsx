@@ -172,10 +172,20 @@ const App: React.FC = () => {
 
   const handleGenerateVideoPrompt = async () => {
     if (!designStrategy || !currentSlogan || !currentNiche) return;
+
+    const successfulMockups = images
+      .filter(img => img.imageUrl && img.configId !== DESIGN_ASSET_CONFIG.id)
+      .map(img => img.imageUrl!);
+    
+    if (successfulMockups.length === 0) {
+      alert("Please generate some mockups before creating a video script.");
+      return;
+    }
+
     setIsVideoPromptGenerating(true);
     setVideoPrompt(null);
     try {
-      const prompt = await generateVideoPrompt(currentSlogan, currentNiche, currentAudience, designStrategy);
+      const prompt = await generateVideoPrompt(currentSlogan, currentNiche, currentAudience, designStrategy, successfulMockups);
       setVideoPrompt(prompt);
       setIsVideoPromptModalOpen(true);
     } catch(e) {
