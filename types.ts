@@ -1,4 +1,5 @@
 
+
 export interface DesignStrategy {
   designStyle: {
     typography: string;
@@ -37,10 +38,44 @@ export interface GeneratedImage {
 
 export enum GenerationStatus {
   IDLE = 'IDLE',
+  GENERATING_5_ASSETS = 'GENERATING_5_ASSETS',
+  REVIEW_5_ASSETS = 'REVIEW_5_ASSETS',
   ANALYZING = 'ANALYZING',
-  GENERATING_ASSET = 'GENERATING_ASSET',
-  REVIEW_ASSET = 'REVIEW_ASSET',
   GENERATING_MOCKUPS = 'GENERATING_MOCKUPS',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR'
+}
+
+export interface StrategySuggestion {
+  title: string;
+  nicheId: string;
+  styleId: string;
+  colorId: string;
+  rationale: string;
+  designStyle: {
+    typography: string;
+    artStyle: string;
+    colors: string;
+    mood: string;
+  };
+}
+
+export interface DesignAsset {
+  id: string;
+  imageUrl: string | null;
+  loading: boolean;
+  error: string | null;
+  strategy: StrategySuggestion;
+}
+
+export interface TrendingSlogan {
+  slogan: string;
+  rationale: string;
+  suggestedSearchTerm: string;
+}
+
+export interface ProductListingContent {
+  title: string;
+  description: string;
+  tags: string[];
 }

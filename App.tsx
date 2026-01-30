@@ -1,20 +1,29 @@
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import JSZip from 'jszip';
-import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES, ALL_CONFIGS } from './constants';
-import { GeneratedImage, GenerationStatus, DesignStrategy } from './types';
-import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt } from './services/geminiService';
+import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES, ALL_CONFIGS, NICHES, DESIGN_STYLES, COLOR_PALETTES } from './constants';
+import { GeneratedImage, GenerationStatus, DesignStrategy, DesignAsset, StrategySuggestion, ProductListingContent } from './types';
+import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt, generateFiveDesignConcepts, generateProductListingContent } from './services/geminiService';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ImageCard from './components/ImageCard';
-import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X } from 'lucide-react';
+import DesignAssetCard from './components/DesignAssetCard';
+import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X, Tags } from 'lucide-react';
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const App: React.FC = () => {
   const [images, setImages] = useState<GeneratedImage[]>(INITIAL_IMAGES);
-  const [currentSlogan, setCurrentSlogan] = useState<string>('');
-  const [currentNiche, setCurrentNiche] = useState<string>('');
-  const [currentAudience, setCurrentAudience] = useState<string>('');
   const [designStrategy, setDesignStrategy] = useState<DesignStrategy | null>(null);
   const [status, setStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
+  
+  const [currentSlogan, setCurrentSlogan] = useState<string>('');
+  const [currentAudience, setCurrentAudience] = useState<string>('');
+  
+  const [designAssets, setDesignAssets] = useState<DesignAsset[]>([]);
+  const [selectedDesignAssetId, setSelectedDesignAssetId] = useState<string | null>(null);
+
   const [isZipping, setIsZipping] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   
@@ -26,6 +35,12 @@ const App: React.FC = () => {
   const [isVideoPromptGenerating, setIsVideoPromptGenerating] = useState(false);
   const [isVideoPromptModalOpen, setIsVideoPromptModalOpen] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+
+  const [productListing, setProductListing] = useState<ProductListingContent | null>(null);
+  const [isListingModalOpen, setIsListingModalOpen] = useState(false);
+  const [isGeneratingListing, setIsGeneratingListing] = useState(false);
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+
 
   useEffect(() => {
     const checkKey = async () => {
@@ -40,13 +55,19 @@ const App: React.FC = () => {
     setStatus(GenerationStatus.IDLE);
     setImages(INITIAL_IMAGES);
     setCurrentSlogan('');
+    setCurrentAudience('');
     setDesignStrategy(null);
+    setDesignAssets([]);
+    setSelectedDesignAssetId(null);
     setVideoUrl(null);
     setIsVideoGenerating(false);
     setVideoError(null);
     setVideoPrompt(null);
     setIsVideoPromptGenerating(false);
     setIsVideoPromptModalOpen(false);
+    setProductListing(null);
+    setIsListingModalOpen(false);
+    setIsGeneratingListing(false);
   };
 
   const handleOpenKeySelector = async () => {
@@ -55,7 +76,7 @@ const App: React.FC = () => {
     setHasApiKey(true); 
   };
 
-  const handleError = (error: any, configId?: string) => {
+  const handleError = (error: any, assetId?: string) => {
     const isPermissionError = error?.message?.includes('403') || error?.message?.includes('PERMISSION_DENIED');
     const isQuotaError = !isPermissionError && (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('API key not valid'));
 
@@ -66,69 +87,119 @@ const App: React.FC = () => {
         errorMessage = 'API Quota/Key Error: Please connect a valid, paid API key.';
     }
     
-    if (configId) {
-      setImages(prev => prev.map(img => 
-        img.configId === configId ? { ...img, loading: false, error: errorMessage } : img
+    if (assetId) {
+      setDesignAssets(prev => prev.map(asset => 
+        asset.id === assetId ? { ...asset, loading: false, error: errorMessage } : asset
       ));
     }
     
-    // Set global error status if it's a key-related issue
     if (isQuotaError || isPermissionError) {
       setStatus(GenerationStatus.ERROR);
     }
   };
-
-  const handleGenerateDesign = async (slogan: string, niche: string, styleContext: string, audience: string, colorContext: string) => {
+  
+  const handleStartGenerationProcess = async (slogan: string, audience: string) => {
     resetAppState();
     setCurrentSlogan(slogan);
-    setCurrentNiche(niche);
     setCurrentAudience(audience);
-    setStatus(GenerationStatus.ANALYZING);
-    setImages(INITIAL_IMAGES.map(img => ({ ...img, loading: img.configId === DESIGN_ASSET_CONFIG.id })));
+    setStatus(GenerationStatus.GENERATING_5_ASSETS);
 
     try {
-      const strategy = await generateDesignStrategy(slogan, niche, styleContext, audience, colorContext);
-      setDesignStrategy(strategy);
-      setStatus(GenerationStatus.GENERATING_ASSET);
-      const base64Url = await generateMockupImage(DESIGN_ASSET_CONFIG.template(slogan, strategy));
-      setImages(prev => prev.map(img => 
-        img.configId === DESIGN_ASSET_CONFIG.id ? { ...img, loading: false, imageUrl: base64Url } : img
-      ));
-      setStatus(GenerationStatus.REVIEW_ASSET);
-    } catch (error) {
-      handleError(error, DESIGN_ASSET_CONFIG.id);
+      const topConcepts = await generateFiveDesignConcepts(slogan, audience);
+      
+      const initialAssets: DesignAsset[] = topConcepts.map((concept, index) => ({
+        id: `design-${index}`,
+        imageUrl: null,
+        loading: true,
+        error: null,
+        strategy: concept
+      }));
+      setDesignAssets(initialAssets);
+      
+      // Generate concepts sequentially to avoid rate limiting
+      for (const asset of initialAssets) {
+        try {
+            // The detailed strategy is now fetched in the initial call, so we pass it directly.
+            const imageUrl = await generateMockupImage(DESIGN_ASSET_CONFIG.template(slogan, { designStyle: asset.strategy.designStyle } as DesignStrategy));
+            
+            setDesignAssets(prev => prev.map(a => 
+              a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
+            ));
+        } catch (error: any) {
+            handleError(error, asset.id);
+        }
+        await sleep(5000); // Add a delay to prevent rate limiting
+      }
+
+      setStatus(GenerationStatus.REVIEW_5_ASSETS);
+
+    } catch (e: any) {
+      handleError(e);
+      setStatus(GenerationStatus.ERROR);
     }
   };
 
-  const handleRegenerateDesign = async () => {
-    if (!currentSlogan) return;
-    setStatus(GenerationStatus.GENERATING_ASSET);
-    setImages(prev => prev.map(img => img.configId === DESIGN_ASSET_CONFIG.id ? { ...img, loading: true, error: null } : img));
-    try {
-      const base64Url = await generateMockupImage(DESIGN_ASSET_CONFIG.template(currentSlogan, designStrategy || undefined));
-      setImages(prev => prev.map(img => img.configId === DESIGN_ASSET_CONFIG.id ? { ...img, loading: false, imageUrl: base64Url } : img));
-      setStatus(GenerationStatus.REVIEW_ASSET);
-    } catch (error) {
-      handleError(error, DESIGN_ASSET_CONFIG.id);
-    }
+  const handleSelectDesign = (assetId: string) => {
+    setSelectedDesignAssetId(assetId);
   };
 
-  const handleApproveAndGenerateMockups = async () => {
-    const designAsset = images.find(img => img.configId === DESIGN_ASSET_CONFIG.id);
-    if (!designAsset?.imageUrl || !designStrategy) return;
-    setStatus(GenerationStatus.GENERATING_MOCKUPS);
-    setImages(prev => prev.map(img => img.configId !== DESIGN_ASSET_CONFIG.id ? { ...img, loading: true, error: null } : img));
-    PRODUCT_MOCKUP_CONFIGS.forEach((config) => {
-      generateSingleMockup(config.id, config.template(currentSlogan, designStrategy), designAsset.imageUrl!);
-    });
-  };
-
-  const generateSingleMockup = async (configId: string, prompt: string, referenceImage: string) => {
+  const generateSingleMockup = useCallback(async (configId: string, prompt: string, referenceImage: string) => {
     try {
       const base64Url = await generateMockupImage(prompt, referenceImage);
       setImages(prev => prev.map(img => img.configId === configId ? { ...img, loading: false, imageUrl: base64Url } : img));
-    } catch (error) {
-      handleError(error, configId);
+    } catch (error: any) {
+      const isPermissionError = error?.message?.includes('403') || error?.message?.includes('PERMISSION_DENIED');
+      const isQuotaError = !isPermissionError && (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('API key not valid'));
+
+      let errorMessage = error.message || 'An unknown error occurred.';
+      if (isPermissionError) {
+          errorMessage = "Permission Denied: Enable Vertex AI API.";
+      } else if (isQuotaError) {
+          errorMessage = 'API Quota/Key Error: Check key.';
+      }
+      
+      setImages(prev => prev.map(img => img.configId === configId ? { ...img, loading: false, error: errorMessage } : img));
+
+      if (isQuotaError || isPermissionError) {
+        setStatus(GenerationStatus.ERROR);
+      }
+    }
+  }, []);
+
+  const handleApproveAndGenerateMockups = async () => {
+    const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
+    if (!selectedAsset?.imageUrl) return;
+
+    setStatus(GenerationStatus.GENERATING_MOCKUPS);
+    
+    // Set the first image (design asset) for the final grid
+    const finalImages: GeneratedImage[] = ALL_CONFIGS.map(config => ({
+      id: config.id,
+      configId: config.id,
+      title: config.title,
+      imageUrl: config.id === DESIGN_ASSET_CONFIG.id ? selectedAsset.imageUrl : null,
+      loading: config.id !== DESIGN_ASSET_CONFIG.id,
+      error: null,
+    }));
+    setImages(finalImages);
+
+    // Generate detailed strategy for the selected design to guide mockups
+    try {
+        const nicheObj = NICHES.find(n => n.id === selectedAsset.strategy.nicheId) || NICHES[0];
+        const styleObj = DESIGN_STYLES.find(s => s.id === selectedAsset.strategy.styleId) || DESIGN_STYLES[0];
+        const colorObj = COLOR_PALETTES.find(c => c.id === selectedAsset.strategy.colorId) || COLOR_PALETTES[0];
+        
+        const detailedStrategy = await generateDesignStrategy(currentSlogan, nicheObj.label, styleObj.context, currentAudience, colorObj.context);
+        setDesignStrategy(detailedStrategy);
+        
+        // Generate mockups sequentially with a delay
+        for (const config of PRODUCT_MOCKUP_CONFIGS) {
+          await generateSingleMockup(config.id, config.template(currentSlogan, detailedStrategy), selectedAsset.imageUrl!);
+          await sleep(5000);
+        }
+    } catch (e) {
+      handleError(e);
+      setStatus(GenerationStatus.ERROR);
     }
   };
   
@@ -171,7 +242,9 @@ const App: React.FC = () => {
   };
 
   const handleGenerateVideoPrompt = async () => {
-    if (!designStrategy || !currentSlogan || !currentNiche) return;
+    const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
+    const niche = NICHES.find(n => n.id === selectedAsset?.strategy.nicheId)?.label || 'General';
+    if (!designStrategy || !currentSlogan || !niche) return;
 
     const successfulMockups = images
       .filter(img => img.imageUrl && img.configId !== DESIGN_ASSET_CONFIG.id)
@@ -185,7 +258,7 @@ const App: React.FC = () => {
     setIsVideoPromptGenerating(true);
     setVideoPrompt(null);
     try {
-      const prompt = await generateVideoPrompt(currentSlogan, currentNiche, currentAudience, designStrategy, successfulMockups);
+      const prompt = await generateVideoPrompt(currentSlogan, niche, currentAudience, designStrategy, successfulMockups);
       setVideoPrompt(prompt);
       setIsVideoPromptModalOpen(true);
     } catch(e) {
@@ -193,6 +266,29 @@ const App: React.FC = () => {
       alert("Sorry, the AI Director is busy. Please try again in a moment.");
     } finally {
       setIsVideoPromptGenerating(false);
+    }
+  };
+
+  const handleGenerateListingContent = async () => {
+    const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
+    const niche = NICHES.find(n => n.id === selectedAsset?.strategy.nicheId)?.label || 'General';
+    if (!designStrategy || !currentSlogan || !niche) return;
+
+    setIsGeneratingListing(true);
+    setProductListing(null);
+    try {
+        const content = await generateProductListingContent(
+            currentSlogan,
+            niche,
+            currentAudience,
+            designStrategy.designStyle.mood
+        );
+        setProductListing(content);
+        setIsListingModalOpen(true);
+    } catch (e) {
+        alert("Sorry, the AI Merchandiser is busy. Please try again in a moment.");
+    } finally {
+        setIsGeneratingListing(false);
     }
   };
 
@@ -204,6 +300,12 @@ const App: React.FC = () => {
     }
   };
 
+  const handleCopySection = (text: string, section: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSection(section);
+    setTimeout(() => setCopiedSection(null), 2000);
+  };
+
   useEffect(() => {
     const isMockupsLoading = images.filter(i => i.configId !== DESIGN_ASSET_CONFIG.id).some(img => img.loading);
     if (!isMockupsLoading && status === GenerationStatus.GENERATING_MOCKUPS) {
@@ -211,19 +313,27 @@ const App: React.FC = () => {
     }
   }, [images, status]);
 
+  // FIX: Implement retry/regenerate functionality for individual mockups.
   const handleRetry = useCallback((configId: string) => {
-    if (!currentSlogan) return;
-    if (configId === DESIGN_ASSET_CONFIG.id) {
-      handleRegenerateDesign();
+    if (status === GenerationStatus.REVIEW_5_ASSETS) {
+      alert("To retry a concept, please use the 'Start Over' button for a fresh set of concepts.");
       return;
     }
-    const designAsset = images.find(img => img.configId === DESIGN_ASSET_CONFIG.id);
-    const config = PRODUCT_MOCKUP_CONFIGS.find(c => c.id === configId);
-    if (config && designAsset?.imageUrl) {
-      setImages(prev => prev.map(img => img.configId === configId ? { ...img, loading: true, error: null } : img));
-      generateSingleMockup(configId, config.template(currentSlogan, designStrategy || undefined), designAsset.imageUrl);
+
+    if (configId === DESIGN_ASSET_CONFIG.id) return; // Cannot retry main asset here
+
+    const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
+    if (selectedAsset?.imageUrl && designStrategy && currentSlogan) {
+      const config = PRODUCT_MOCKUP_CONFIGS.find(c => c.id === configId);
+      if (config) {
+        setImages(prev => prev.map(img => 
+          img.configId === configId ? { ...img, loading: true, error: null } : img
+        ));
+        generateSingleMockup(config.id, config.template(currentSlogan, designStrategy), selectedAsset.imageUrl);
+      }
     }
-  }, [currentSlogan, images, designStrategy]);
+  }, [status, designAssets, selectedDesignAssetId, designStrategy, currentSlogan, generateSingleMockup]);
+
 
   const handleDownloadAll = async () => {
     setIsZipping(true);
@@ -266,13 +376,15 @@ const App: React.FC = () => {
   };
 
   const getStatusText = () => {
+    if (status === GenerationStatus.GENERATING_5_ASSETS) return "AI is generating 3 concepts...";
+    if (status === GenerationStatus.GENERATING_MOCKUPS) return "Generating all your mockups...";
     if (status === GenerationStatus.ANALYZING) return "AI Strategist is thinking...";
-    if (status === GenerationStatus.GENERATING_ASSET) return "Drafting Design Asset...";
     return "Processing...";
   }
 
   const firstError = images.find(img => img.error)?.error;
   const isPermissionError = firstError?.includes('Permission Denied');
+  const isGeneratingAnything = status !== GenerationStatus.IDLE && status !== GenerationStatus.COMPLETED && status !== GenerationStatus.ERROR;
 
   return (
     <div className="min-h-screen pb-20 bg-slate-900">
@@ -302,8 +414,12 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className={status === GenerationStatus.REVIEW_ASSET || status === GenerationStatus.GENERATING_MOCKUPS ? 'pointer-events-none opacity-40 filter blur-sm transition-all duration-500' : 'transition-all duration-500'}>
-         <PromptInput onGenerate={handleGenerateDesign} isGenerating={status === GenerationStatus.ANALYZING || status === GenerationStatus.GENERATING_ASSET} statusText={getStatusText()} />
+      <div className="transition-all duration-500 relative">
+         <PromptInput 
+            onGenerate={handleStartGenerationProcess}
+            isGenerating={isGeneratingAnything}
+            statusText={getStatusText()}
+         />
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
@@ -311,112 +427,55 @@ const App: React.FC = () => {
           <div className="flex flex-col items-center justify-center p-12 bg-slate-800 rounded-3xl border border-rose-500/30 mb-8">
             <AlertCircle className="w-16 h-16 text-rose-500 mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">{isPermissionError ? 'Permission Denied' : 'Generation Failed'}</h3>
-            
             {isPermissionError ? (
-              <>
-                <p className="text-slate-400 text-center max-w-md mb-6">
-                  Your API key is valid, but lacks permissions. Please enable the <strong>Vertex AI API</strong> in your Google Cloud project to proceed.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <a 
-                      href="https://console.cloud.google.com/apis/library/aiplatform.googleapis.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/30"
-                    >
-                      <ExternalLink className="w-5 h-5" />
-                      Enable Vertex AI API
-                    </a>
-                    <button 
-                      onClick={handleOpenKeySelector}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all"
-                    >
-                      <Key className="w-5 h-5" />
-                      Use Different Key
-                    </button>
-                </div>
-              </>
+               <p className="text-slate-400 text-center max-w-md mb-6">Your API key is valid, but lacks permissions. Please enable the <strong>Vertex AI API</strong> in your Google Cloud project to proceed.</p>
             ) : (
-              <>
-                <p className="text-slate-400 text-center max-w-md mb-6">
-                  You may have hit API quota limits or the key is invalid. To continue generating, please connect your personal paid API key.
-                </p>
-                <button 
-                  onClick={handleOpenKeySelector}
-                  className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/30"
-                >
-                  <Key className="w-5 h-5" />
-                  Connect Personal Key & Retry
-                </button>
-              </>
+               <p className="text-slate-400 text-center max-w-md mb-6">You may have hit API quota limits or the key is invalid. To continue generating, please connect your personal paid API key.</p>
             )}
+            <button onClick={resetAppState} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/30">
+              <RefreshCw className="w-5 h-5" /> Try Again
+            </button>
           </div>
         )}
 
-        {(status === GenerationStatus.REVIEW_ASSET || status === GenerationStatus.GENERATING_ASSET || status === GenerationStatus.ANALYZING) && (
-           <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-8 duration-700">
-             <div className="w-full max-w-lg mb-8">
-               <div className="flex items-center justify-between mb-4 px-2">
-                 <h2 className="text-2xl font-bold text-white">
-                   {status === GenerationStatus.ANALYZING ? 'Crafting Strategy...' : 'Step 1: Design Review'}
-                 </h2>
-                 <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/30 uppercase tracking-widest font-bold">Vector Draft</span>
-               </div>
-               
-               {designStrategy && status === GenerationStatus.REVIEW_ASSET && (
-                 <div className="mb-6 p-5 bg-slate-800 rounded-xl border border-slate-700 shadow-2xl">
-                   <div className="flex items-center gap-3 mb-4 text-indigo-400 font-bold uppercase text-xs tracking-widest border-b border-slate-700 pb-3">
-                     <BrainCircuit className="w-4 h-4" />
-                     Market Insight
-                   </div>
-                   <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-slate-500 text-[10px] uppercase font-bold mb-1">Target Niche</p>
-                        <p className="text-white font-medium capitalize">{currentNiche}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-[10px] uppercase font-bold mb-1">Audience</p>
-                        <p className="text-white font-medium capitalize">{currentAudience || 'General'}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-slate-500 text-[10px] uppercase font-bold mb-1">Art Direction</p>
-                        <p className="text-slate-300 text-xs leading-relaxed">{designStrategy.designStyle.typography} — {designStrategy.designStyle.artStyle}</p>
-                      </div>
-                   </div>
-                 </div>
-               )}
-
-               {images.filter(i => i.configId === DESIGN_ASSET_CONFIG.id).map(image => (
-                 <ImageCard key={image.id} image={image} onRetry={handleRetry} />
-               ))}
-             </div>
-             
-             {status === GenerationStatus.REVIEW_ASSET && (
-               <div className="flex flex-col sm:flex-row gap-4 mb-20">
-                 <button 
-                    onClick={handleRegenerateDesign}
-                    className="flex items-center justify-center gap-2 px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700"
-                 >
-                   <RefreshCw className="w-5 h-5" />
-                   Tweak Design
-                 </button>
-                 <button 
-                    onClick={handleApproveAndGenerateMockups}
-                    className="flex items-center justify-center gap-2 px-10 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-green-600/20"
-                 >
-                   <CheckCircle2 className="w-5 h-5" />
-                   Looks Good, Mock It Up!
-                 </button>
-               </div>
-             )}
-           </div>
+        {(status === GenerationStatus.GENERATING_5_ASSETS || status === GenerationStatus.REVIEW_5_ASSETS) && (
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="text-center mb-8">
+                <h2 className="text-3xl font-extrabold text-white">Step 1: Choose Your Winning Concept</h2>
+                <p className="text-slate-400 mt-1">The AI has generated 3 concepts based on top market trends. Select one to continue.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {designAssets.map(asset => (
+                <DesignAssetCard 
+                  key={asset.id} 
+                  asset={asset} 
+                  isSelected={selectedDesignAssetId === asset.id}
+                  onSelect={handleSelectDesign}
+                />
+              ))}
+            </div>
+            {status === GenerationStatus.REVIEW_5_ASSETS && (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <button onClick={resetAppState} className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all">
+                      <RefreshCw className="w-5 h-5" /> Start Over
+                  </button>
+                  <button 
+                      onClick={handleApproveAndGenerateMockups}
+                      disabled={!selectedDesignAssetId}
+                      className="flex items-center justify-center gap-2 px-10 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-green-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                      <CheckCircle2 className="w-5 h-5" /> Generate Mockups With This Design
+                  </button>
+              </div>
+            )}
+          </div>
         )}
 
         {(status === GenerationStatus.GENERATING_MOCKUPS || status === GenerationStatus.COMPLETED) && (
           <div className="animate-in fade-in duration-1000">
              <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4 border-b border-slate-800 pb-6">
                 <div>
-                   <h2 className="text-3xl font-extrabold text-white">Market-Ready Assets</h2>
+                   <h2 className="text-3xl font-extrabold text-white">Step 2: Market-Ready Assets</h2>
                    <p className="text-slate-400 mt-1">High-quality visuals optimized for e-commerce and social media.</p>
                 </div>
                 {status === GenerationStatus.COMPLETED && (
@@ -428,6 +487,14 @@ const App: React.FC = () => {
                     >
                       {isVideoPromptGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
                       Generate Video Script
+                    </button>
+                     <button 
+                      onClick={handleGenerateListingContent}
+                      disabled={isGeneratingListing}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-600/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {isGeneratingListing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Tags className="w-5 h-5" />}
+                      Generate SEO Content
                     </button>
                     <button 
                         onClick={handleGenerateVideo}
@@ -453,31 +520,9 @@ const App: React.FC = () => {
              { (isVideoGenerating || videoUrl || videoError) && (
                 <div className="mb-12">
                     <h3 className="text-2xl font-bold text-white mb-4">Social Media Video</h3>
-                    {isVideoGenerating && (
-                        <div className="aspect-video w-full max-w-md mx-auto bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-slate-700">
-                           <Loader2 className="w-12 h-12 text-rose-500 animate-spin mb-4" />
-                           <p className="text-white font-semibold">Rendering your video...</p>
-                           <p className="text-slate-400 text-sm">This may take a few minutes.</p>
-                        </div>
-                    )}
-                    {videoError && (
-                      <div className="aspect-video w-full max-w-md mx-auto bg-rose-500/10 rounded-xl flex flex-col items-center justify-center border border-rose-500/30 p-4">
-                           <AlertCircle className="w-12 h-12 text-rose-500 mb-4" />
-                           <p className="text-white font-semibold text-center mb-4">Video Generation Failed</p>
-                           <p className="text-rose-200 text-sm text-center mb-6 break-words">{videoError}</p>
-                           <button onClick={handleOpenKeySelector} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm">
-                              <Key className="w-4 h-4"/> Connect/Check API Key
-                           </button>
-                        </div>
-                    )}
-                    {videoUrl && (
-                        <div className="w-full max-w-md mx-auto">
-                          <video src={videoUrl} controls className="rounded-xl w-full aspect-[9/16] bg-black" />
-                          <a href={videoUrl} download={`promo_video_${currentSlogan.slice(0, 15)}.mp4`} className="mt-4 w-full flex items-center justify-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/30">
-                            <Download className="w-5 h-5" /> Download Video (MP4)
-                          </a>
-                        </div>
-                    )}
+                    {isVideoGenerating && (<div className="aspect-video w-full max-w-md mx-auto bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-slate-700"><Loader2 className="w-12 h-12 text-rose-500 animate-spin mb-4" /><p className="text-white font-semibold">Rendering your video...</p><p className="text-slate-400 text-sm">This may take a few minutes.</p></div>)}
+                    {videoError && (<div className="aspect-video w-full max-w-md mx-auto bg-rose-500/10 rounded-xl flex flex-col items-center justify-center border border-rose-500/30 p-4"><AlertCircle className="w-12 h-12 text-rose-500 mb-4" /><p className="text-white font-semibold text-center mb-4">Video Generation Failed</p><p className="text-rose-200 text-sm text-center mb-6 break-words">{videoError}</p><button onClick={handleOpenKeySelector} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm"><Key className="w-4 h-4"/> Connect/Check API Key</button></div>)}
+                    {videoUrl && (<div className="w-full max-w-md mx-auto"><video src={videoUrl} controls className="rounded-xl w-full aspect-[9/16] bg-black" /><a href={videoUrl} download={`promo_video_${currentSlogan.slice(0, 15)}.mp4`} className="mt-4 w-full flex items-center justify-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/30"><Download className="w-5 h-5" /> Download Video (MP4)</a></div>)}
                 </div>
              )}
 
@@ -501,28 +546,68 @@ const App: React.FC = () => {
       {isVideoPromptModalOpen && videoPrompt && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl flex flex-col">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <div className='flex items-center gap-2'>
-                <FileText className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-lg font-bold text-white">AI Video Director Script</h3>
-              </div>
-              <button onClick={() => setIsVideoPromptModalOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors">
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-            <pre className="p-6 text-sm text-slate-300 overflow-y-auto max-h-[60vh] whitespace-pre-wrap font-sans bg-slate-900/50">
-              {videoPrompt}
-            </pre>
-            <div className="p-4 border-t border-slate-700 flex justify-end">
-                <button 
-                  onClick={handleCopyPrompt}
-                  className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-indigo-500/30"
-                >
-                  <Clipboard className="w-4 h-4" />
-                  {hasCopied ? 'Copied!' : 'Copy Script'}
-                </button>
-            </div>
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center"><div className='flex items-center gap-2'><FileText className="w-5 h-5 text-indigo-400" /><h3 className="text-lg font-bold text-white">AI Video Director Script</h3></div><button onClick={() => setIsVideoPromptModalOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors"><X className="w-5 h-5 text-slate-400" /></button></div>
+            <pre className="p-6 text-sm text-slate-300 overflow-y-auto max-h-[60vh] whitespace-pre-wrap font-sans bg-slate-900/50">{videoPrompt}</pre>
+            <div className="p-4 border-t border-slate-700 flex justify-end"><button onClick={handleCopyPrompt} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-indigo-500/30"><Clipboard className="w-4 h-4" />{hasCopied ? 'Copied!' : 'Copy Script'}</button></div>
           </div>
+        </div>
+      )}
+
+      {isListingModalOpen && productListing && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+                <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+                    <div className='flex items-center gap-2'>
+                        <Tags className="w-5 h-5 text-teal-400" />
+                        <h3 className="text-lg font-bold text-white">Product Listing SEO Content</h3>
+                    </div>
+                    <button onClick={() => setIsListingModalOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors">
+                        <X className="w-5 h-5 text-slate-400" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-6 overflow-y-auto">
+                    {/* Title Section */}
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-white">Title</h4>
+                            <button onClick={() => handleCopySection(productListing.title, 'title')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors">
+                                <Clipboard className="w-3 h-3" />
+                                {copiedSection === 'title' ? 'Copied!' : 'Copy'}
+                            </button>
+                        </div>
+                        <p className="p-3 bg-slate-900/50 rounded-lg text-sm text-slate-300 border border-slate-700">{productListing.title}</p>
+                    </div>
+                    {/* Description Section */}
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-white">Description</h4>
+                            <button onClick={() => handleCopySection(productListing.description, 'description')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors">
+                                <Clipboard className="w-3 h-3" />
+                                {copiedSection === 'description' ? 'Copied!' : 'Copy'}
+                            </button>
+                        </div>
+                        <p className="p-3 bg-slate-900/50 rounded-lg text-sm text-slate-300 border border-slate-700 whitespace-pre-wrap">{productListing.description}</p>
+                    </div>
+                    {/* Tags Section */}
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-white">Tags / Keywords</h4>
+                            <button onClick={() => handleCopySection(productListing.tags.join(', '), 'tags')} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors">
+                                <Clipboard className="w-3 h-3" />
+                                {copiedSection === 'tags' ? 'Copied!' : 'Copy as CSV'}
+                            </button>
+                        </div>
+                        <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-700 flex flex-wrap gap-2">
+                            {productListing.tags.map((tag, index) => (
+                                <span key={index} className="bg-slate-700 text-slate-300 text-xs font-medium px-2.5 py-1 rounded-full">{tag}</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-700 flex justify-end">
+                    <button onClick={() => setIsListingModalOpen(false)} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-indigo-500/30">Close</button>
+                </div>
+            </div>
         </div>
       )}
     </div>
