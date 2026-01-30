@@ -224,16 +224,11 @@ const App: React.FC = () => {
       setVideoUrl(url);
 
     } catch (error: any) {
-      const isPermissionError = error?.message?.includes('403') || error?.message?.includes('PERMISSION_DENIED');
-      const isQuotaError = !isPermissionError && (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('not found'));
-      
       let videoErrorMessage = 'Video generation failed. Please try again.';
-      if (isPermissionError) {
-        videoErrorMessage = 'Permission Denied. Please ensure the "Vertex AI API" is enabled in your Google Cloud project to generate videos.';
-      } else if (isQuotaError) {
-        videoErrorMessage = 'Video generation requires a valid paid API Key with sufficient quota. Please check your key and billing status.';
+      if (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
+        videoErrorMessage = 'API rate limit reached. Please wait a moment and try again.';
       } else if (error.message) {
-        videoErrorMessage = error.message;
+        videoErrorMessage = `An API error occurred: ${error.message}`;
       }
       setVideoError(videoErrorMessage);
     } finally {
@@ -498,9 +493,9 @@ const App: React.FC = () => {
                     </button>
                     <button 
                         onClick={handleGenerateVideo}
-                        disabled={!hasApiKey || isVideoGenerating}
+                        disabled={isVideoGenerating}
                         className="flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        title={!hasApiKey ? "Connect a paid API key to enable video generation" : ""}
+                        title="Generate a short promo video for social media"
                       >
                         {isVideoGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Film className="w-5 h-5" />}
                         Create Promo Video
@@ -521,7 +516,7 @@ const App: React.FC = () => {
                 <div className="mb-12">
                     <h3 className="text-2xl font-bold text-white mb-4">Social Media Video</h3>
                     {isVideoGenerating && (<div className="aspect-video w-full max-w-md mx-auto bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-slate-700"><Loader2 className="w-12 h-12 text-rose-500 animate-spin mb-4" /><p className="text-white font-semibold">Rendering your video...</p><p className="text-slate-400 text-sm">This may take a few minutes.</p></div>)}
-                    {videoError && (<div className="aspect-video w-full max-w-md mx-auto bg-rose-500/10 rounded-xl flex flex-col items-center justify-center border border-rose-500/30 p-4"><AlertCircle className="w-12 h-12 text-rose-500 mb-4" /><p className="text-white font-semibold text-center mb-4">Video Generation Failed</p><p className="text-rose-200 text-sm text-center mb-6 break-words">{videoError}</p><button onClick={handleOpenKeySelector} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all text-sm"><Key className="w-4 h-4"/> Connect/Check API Key</button></div>)}
+                    {videoError && (<div className="aspect-video w-full max-w-md mx-auto bg-rose-500/10 rounded-xl flex flex-col items-center justify-center border border-rose-500/30 p-4"><AlertCircle className="w-12 h-12 text-rose-500 mb-4" /><p className="text-white font-semibold text-center mb-4">Video Generation Failed</p><p className="text-rose-200 text-sm text-center mb-6 break-words">{videoError}</p></div>)}
                     {videoUrl && (<div className="w-full max-w-md mx-auto"><video src={videoUrl} controls className="rounded-xl w-full aspect-[9/16] bg-black" /><a href={videoUrl} download={`promo_video_${currentSlogan.slice(0, 15)}.mp4`} className="mt-4 w-full flex items-center justify-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/30"><Download className="w-5 h-5" /> Download Video (MP4)</a></div>)}
                 </div>
              )}

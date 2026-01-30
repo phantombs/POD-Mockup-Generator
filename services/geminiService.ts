@@ -249,33 +249,29 @@ export const generateMockupImage = async (prompt: string, referenceImageBase64?:
 export const generatePromoVideo = async (slogan: string, strategy: DesignStrategy, referenceImagesBase64: string[]): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    const referenceImagesPayload: VideoGenerationReferenceImage[] = referenceImagesBase64
-      .slice(0, 3) // Use up to 3 images as per API limitation
-      .map(b64 => ({
-        image: {
-          imageBytes: b64.replace(/^data:image\/\w+;base64,/, ""),
-          mimeType: 'image/png',
-        },
-        referenceType: VideoGenerationReferenceType.ASSET,
-      }));
-
-    if (referenceImagesPayload.length === 0) {
+    const firstReferenceImage = referenceImagesBase64[0];
+    if (!firstReferenceImage) {
         throw new Error("No valid reference images provided for video generation.");
     }
+
+    const imagePayload = {
+      imageBytes: firstReferenceImage.replace(/^data:image\/\w+;base64,/, ""),
+      mimeType: 'image/png',
+    };
     
     const videoCtx = strategy.mockups.video || { music: "upbeat electronic", style: "fast-paced", transitions: "quick cuts" };
 
     const prompt = `Create a short, dynamic, promotional video for a new product line with the slogan "${slogan}". 
     Video Style: ${videoCtx.style}, with ${videoCtx.transitions}. 
     Music style suggestion: ${videoCtx.music}.
-    Showcase the product designs from the reference images in a trendy style suitable for TikTok or YouTube Shorts.`;
+    Animate the design from the reference image in a trendy style suitable for TikTok or YouTube Shorts.`;
 
     let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-generate-preview',
+      model: 'veo-3.1-fast-generate-preview',
       prompt: prompt,
+      image: imagePayload,
       config: {
         numberOfVideos: 1,
-        referenceImages: referenceImagesPayload,
         resolution: '720p',
         aspectRatio: '9:16' // Vertical for social media
       }
