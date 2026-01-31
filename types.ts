@@ -79,3 +79,11 @@ export interface ProductListingContent {
   description: string;
   tags: string[];
 }
+
+export interface ApiKey {
+  id: string;
+  key: string;
+}
+
+export type ImageModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview';
+export type ImageSize = '1K' | '2K' | '4K';

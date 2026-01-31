@@ -1,9 +1,35 @@
 import React from 'react';
-import { Palette, ShoppingBag, Sparkles } from 'lucide-react';
+import { Palette, ShoppingBag, Sparkles, Key, CheckCircle } from 'lucide-react';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenKeyManager: () => void;
+  activeKeyDisplay: string | null;
+}
+
+const Header: React.FC<HeaderProps> = ({ onOpenKeyManager, activeKeyDisplay }) => {
   return (
-    <div className="w-full py-8 text-center bg-gradient-to-b from-slate-900 to-slate-800 border-b border-slate-700">
+    <div className="relative w-full py-8 text-center bg-gradient-to-b from-slate-900 to-slate-800 border-b border-slate-700">
+      
+      <div className="absolute top-4 right-4">
+        <button 
+          onClick={onOpenKeyManager}
+          className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs text-slate-300 hover:text-white transition-colors"
+        >
+          <Key className="w-4 h-4 text-amber-400" />
+          <div className="text-left">
+            <span className="font-bold">API Key Manager</span>
+            {activeKeyDisplay ? (
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-3 h-3 text-green-500" />
+                <span className="text-slate-400 font-mono">{activeKeyDisplay}</span>
+              </div>
+            ) : (
+              <span className="text-slate-400">Using default key</span>
+            )}
+          </div>
+        </button>
+      </div>
+
       <div className="flex items-center justify-center gap-3 mb-4">
         <div className="p-3 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30">
           <Palette className="w-8 h-8 text-white" />

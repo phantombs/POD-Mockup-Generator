@@ -1,11 +1,19 @@
 import { GoogleGenAI, Type, VideoGenerationReferenceImage, VideoGenerationReferenceType } from "@google/genai";
-import { DesignStrategy, StrategySuggestion, TrendingSlogan, ProductListingContent } from "../types";
+import { DesignStrategy, StrategySuggestion, TrendingSlogan, ProductListingContent, ImageModel, ImageSize } from "../types";
 import { NICHES, DESIGN_STYLES, COLOR_PALETTES } from "../constants";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const generateSloganSuggestions = async (audience: string, topic: string, timeframe: string): Promise<TrendingSlogan[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getApiClient = (apiKey: string | null) => {
+    const keyToUse = apiKey || process.env.API_KEY;
+    if (!keyToUse) {
+        throw new Error("API key is missing. Please add and select a key in the API Key Manager.");
+    }
+    return new GoogleGenAI({ apiKey: keyToUse });
+};
+
+export const generateSloganSuggestions = async (audience: string, topic: string, timeframe: string, apiKey: string | null): Promise<TrendingSlogan[]> => {
+  const ai = getApiClient(apiKey);
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -57,18 +65,50 @@ export const generateSloganSuggestions = async (audience: string, topic: string,
   }
 };
 
-export const generateFiveDesignConcepts = async (slogan: string, audience: string): Promise<StrategySuggestion[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const generateFiveDesignConcepts = async (slogan: string, audience: string, apiKey: string | null, isThinkingMode: boolean): Promise<StrategySuggestion[]> => {
+  const ai = getApiClient(apiKey);
   try {
     const nicheOptions = NICHES.map(n => `ID: "${n.id}", Label: "${n.label}"`).join('\n');
     const styleOptions = DESIGN_STYLES.map(s => `ID: "${s.id}", Label: "${s.label}", Context: "${s.context}"`).join('\n');
     const colorOptions = COLOR_PALETTES.map(c => `ID: "${c.id}", Label: "${c.label}", Context: "${c.context}"`).join('\n');
 
+    const model = isThinkingMode ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+    const config: any = {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "A short, catchy title for the strategy, in English." },
+            nicheId: { type: Type.STRING },
+            styleId: { type: Type.STRING },
+            colorId: { type: Type.STRING },
+            rationale: { type: Type.STRING, description: "Your reasoning for choosing this strategy, citing market trends, in Vietnamese." },
+            designStyle: {
+              type: Type.OBJECT,
+              properties: {
+                typography: { type: Type.STRING }, artStyle: { type: Type.STRING }, colors: { type: Type.STRING }, mood: { type: Type.STRING },
+              },
+              required: ["typography", "artStyle", "colors", "mood"]
+            }
+          },
+          required: ["title", "nicheId", "styleId", "colorId", "rationale", "designStyle"]
+        }
+      }
+    };
+
+    if (isThinkingMode) {
+      config.thinkingConfig = { thinkingBudget: 32768 };
+      config.tools = [{ googleSearch: {} }];
+    }
+
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: model,
       contents: `You are an expert Print-on-Demand (POD) market trend analyst and a creative director.
       Your task is to analyze the provided slogan and target audience, then generate the top 3 most commercially viable and distinct design concepts.
       For each concept, you must provide both a high-level strategy and a specific creative direction.
+      ${isThinkingMode ? "You MUST use Google Search to research current trends related to the slogan and audience to ensure your concepts are fresh, relevant, and have a high chance of viral success." : ""}
 
       **Slogan (in English):** "${slogan}"
       **Target Audience:** "${audience || 'General public'}"
@@ -95,33 +135,7 @@ export const generateFiveDesignConcepts = async (slogan: string, audience: strin
       4.  Provide a brief 'rationale' IN VIETNAMESE explaining why this strategy will sell.
       5.  Crucially, for each object, also provide a detailed 'designStyle' object containing specific creative direction IN VIETNAMESE: 'typography', 'artStyle', 'colors', and 'mood'.
       `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "A short, catchy title for the strategy, in English." },
-              nicheId: { type: Type.STRING },
-              styleId: { type: Type.STRING },
-              colorId: { type: Type.STRING },
-              rationale: { type: Type.STRING, description: "Your reasoning for choosing this strategy, citing market trends, in Vietnamese." },
-              designStyle: {
-                type: Type.OBJECT,
-                properties: {
-                  typography: { type: Type.STRING },
-                  artStyle: { type: Type.STRING },
-                  colors: { type: Type.STRING },
-                  mood: { type: Type.STRING },
-                },
-                required: ["typography", "artStyle", "colors", "mood"]
-              }
-            },
-            required: ["title", "nicheId", "styleId", "colorId", "rationale", "designStyle"]
-          }
-        }
-      }
+      config: config
     });
 
     if (response.text) {
@@ -141,9 +155,10 @@ export const generateDesignStrategy = async (
   niche: string, 
   styleContext: string,
   targetAudience: string,
-  colorContext: string
+  colorContext: string,
+  apiKey: string | null
 ): Promise<DesignStrategy> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getApiClient(apiKey);
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -200,13 +215,19 @@ export const generateDesignStrategy = async (
   }
 };
 
-export const generateMockupImage = async (prompt: string, referenceImageBase64?: string | null): Promise<string> => {
+export const generateMockupImage = async (
+    prompt: string, 
+    apiKey: string | null, 
+    model: ImageModel, 
+    imageSize: ImageSize,
+    referenceImageBase64?: string | null
+): Promise<string> => {
   const MAX_RETRIES = 3;
-  const INITIAL_BACKOFF_MS = 6000; // Start with a longer backoff to be safe
+  const RATE_LIMIT_BACKOFF_MS = 32000; // 32 seconds, suitable for a 2 RPM limit.
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = getApiClient(apiKey);
       const parts: any[] = [{ text: prompt }];
       if (referenceImageBase64) {
         const base64Data = referenceImageBase64.replace(/^data:image\/\w+;base64,/, "");
@@ -214,11 +235,17 @@ export const generateMockupImage = async (prompt: string, referenceImageBase64?:
           inlineData: { mimeType: 'image/png', data: base64Data }
         });
       }
+      
+      const config: any = { imageConfig: { aspectRatio: "1:1" } };
+      if (model === 'gemini-3-pro-image-preview') {
+          config.imageConfig.imageSize = imageSize;
+          config.tools = [{google_search: {}}];
+      }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: model,
         contents: { parts: parts },
-        config: { imageConfig: { aspectRatio: "1:1" } }
+        config: config
       });
 
       const candidates = response.candidates;
@@ -227,27 +254,29 @@ export const generateMockupImage = async (prompt: string, referenceImageBase64?:
       const imagePart = candidates[0].content.parts.find(p => p.inlineData);
       if (!imagePart?.inlineData?.data) throw new Error("Missing image data.");
 
+      // Success, return the image
       return `data:image/png;base64,${imagePart.inlineData.data}`;
     } catch (error: any) {
       const errorMessage = JSON.stringify(error) || error.message || '';
       const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED');
 
       if (isRateLimitError && attempt < MAX_RETRIES) {
-        const backoffTime = INITIAL_BACKOFF_MS * Math.pow(2, attempt - 1);
-        console.warn(`Rate limit hit. Retrying attempt ${attempt + 1} in ${backoffTime}ms...`);
-        await sleep(backoffTime);
+        const waitTime = RATE_LIMIT_BACKOFF_MS * attempt; // 32s, then 64s
+        console.warn(`Image generation rate limit hit on attempt ${attempt}. Waiting for ${waitTime / 1000} seconds before retrying...`);
+        await sleep(waitTime);
       } else {
-        console.error("Error generating image:", error);
+        console.error(`Failed to generate image on attempt ${attempt}. Error:`, error);
         throw error;
       }
     }
   }
   
-  throw new Error("Failed to generate image after multiple retries due to rate limiting.");
+  throw new Error("Failed to generate image after all retries.");
 };
 
-export const generatePromoVideo = async (slogan: string, strategy: DesignStrategy, referenceImagesBase64: string[]): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+export const generatePromoVideo = async (slogan: string, strategy: DesignStrategy, referenceImagesBase64: string[], apiKey: string | null): Promise<string> => {
+  const ai = getApiClient(apiKey);
   try {
     const firstReferenceImage = referenceImagesBase64[0];
     if (!firstReferenceImage) {
@@ -273,12 +302,12 @@ export const generatePromoVideo = async (slogan: string, strategy: DesignStrateg
       config: {
         numberOfVideos: 1,
         resolution: '720p',
-        aspectRatio: '9:16' // Vertical for social media
+        aspectRatio: '9:16'
       }
     });
 
     while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+      await new Promise(resolve => setTimeout(resolve, 10000));
       operation = await ai.operations.getVideosOperation({ operation: operation });
     }
 
@@ -286,8 +315,9 @@ export const generatePromoVideo = async (slogan: string, strategy: DesignStrateg
     if (!downloadLink) {
       throw new Error("Video generation completed but no download link was found.");
     }
-
-    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    
+    const keyToUse = apiKey || process.env.API_KEY;
+    const response = await fetch(`${downloadLink}&key=${keyToUse}`);
     if (!response.ok) {
         throw new Error(`Failed to download video: ${response.statusText}`);
     }
@@ -305,9 +335,10 @@ export const generateVideoPrompt = async (
   niche: string,
   targetAudience: string,
   strategy: DesignStrategy,
-  imageUrls: string[]
+  imageUrls: string[],
+  apiKey: string | null
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getApiClient(apiKey);
   try {
     const textPart = {
       text: `
@@ -357,9 +388,10 @@ export const generateProductListingContent = async (
   slogan: string,
   niche: string,
   targetAudience: string,
-  designMood: string
+  designMood: string,
+  apiKey: string | null
 ): Promise<ProductListingContent> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getApiClient(apiKey);
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -404,4 +436,51 @@ export const generateProductListingContent = async (
     console.error("Error generating product listing content:", error);
     throw error;
   }
+};
+
+export const refineProductListingContent = async (
+  existingContent: ProductListingContent,
+  instruction: string,
+  apiKey: string | null
+): Promise<ProductListingContent> => {
+    const ai = getApiClient(apiKey);
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `You are an expert E-commerce SEO and copywriter. A user has provided an existing product listing and an instruction to refine it.
+            Your task is to rewrite the listing based *only* on the instruction. Adhere to the original format and constraints.
+            
+            **Refinement Instruction:** "${instruction}"
+            
+            **Existing Listing JSON:**
+            ${JSON.stringify(existingContent)}
+            
+            Rewrite the JSON object according to the instruction. The output must be ONLY the revised JSON object.
+            `,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    tags: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING }
+                    }
+                  },
+                  required: ["title", "description", "tags"]
+                }
+            }
+        });
+        
+        if (response.text) {
+            return JSON.parse(response.text) as ProductListingContent;
+        }
+        throw new Error("Could not refine the content.");
+
+    } catch (error) {
+        console.error("Error refining product listing:", error);
+        throw error;
+    }
 };
