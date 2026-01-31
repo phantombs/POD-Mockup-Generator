@@ -183,14 +183,6 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
     template: (slogan, strategy) => {
       return `Streetwear style photo of a cozy black hoodie with a large print on the back featuring the design from the reference (quote: "${slogan}"). Atmospheric lighting, urban vibes.`;
     }
-  },
-  {
-    id: 'wallpaper-mockup',
-    title: '11. Digital Wallpaper',
-    description: 'Smartphone wallpaper preview.',
-    template: (slogan, strategy) => {
-      return `A vertical high-resolution digital wallpaper design for a smartphone. The design is based on the reference (quote: "${slogan}"). Minimalist composition, optimized for mobile screens.`;
-    }
   }
 ];
 
