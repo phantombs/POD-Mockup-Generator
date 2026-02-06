@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Sparkles, Users, BrainCircuit, Palette, Film, Wand2, Lightbulb, X, Search, Copy, Telescope, Calendar, HelpCircle } from 'lucide-react';
+import { Loader2, Sparkles, Users, BrainCircuit, Palette, Film, Wand2, Lightbulb, X, Search, Copy, Telescope, Calendar, HelpCircle, ImageIcon } from 'lucide-react';
 import { TrendingSlogan } from '../types';
 
 interface PromptInputProps {
@@ -27,6 +27,7 @@ interface PromptInputProps {
   setSearchTimeframe: (s: string) => void;
   copiedText: string | null;
   handleCopyTrendText: (s: string) => void;
+  onOpenRedesignModal: () => void;
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ 
@@ -35,7 +36,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
   isThinkingMode, setIsThinkingMode,
   onOpenTrendSpy, isTrendSpyModalOpen, setIsTrendSpyModalOpen, isSearchingTrends,
   handleSearchTrends, trendResults, searchTopic, setSearchTopic, searchTimeframe,
-  setSearchTimeframe, copiedText, handleCopyTrendText,
+  setSearchTimeframe, copiedText, handleCopyTrendText, onOpenRedesignModal
 }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,10 +113,18 @@ const PromptInput: React.FC<PromptInputProps> = ({
             </div>
           </label>
         </div>
-
-        <button type="submit" disabled={isGenerating || !currentSlogan.trim()} className="w-full font-bold px-8 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
-          {isGenerating ? ( <><Loader2 className="w-5 h-5 animate-spin" /><span>{statusText || 'Brainstorming...'}</span></> ) : ( <><Sparkles className="w-5 h-5" /><span>Generate Viral Design & Mockups</span></> )}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <button type="submit" disabled={isGenerating || !currentSlogan.trim()} className="w-full font-bold px-8 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
+            {isGenerating ? ( <><Loader2 className="w-5 h-5 animate-spin" /><span>{statusText || 'Brainstorming...'}</span></> ) : ( <><Sparkles className="w-5 h-5" /><span>Generate From Slogan</span></> )}
+          </button>
+          <div className="w-full sm:w-auto flex-shrink-0 text-center">
+             <p className="text-slate-500 text-xs my-2 sm:my-0">OR</p>
+          </div>
+          <button type="button" onClick={onOpenRedesignModal} disabled={isGenerating} className="w-full sm:w-auto font-bold px-8 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+            <ImageIcon className="w-5 h-5" />
+            <span>Redesign an Image</span>
+          </button>
+        </div>
       </form>
       <div className="text-center mt-4 text-slate-500 text-xs flex items-center justify-center gap-4">
         <span className="flex items-center gap-1.5"><BrainCircuit className="w-3 h-3" /> Strategy: Gemini Flash & Pro</span>

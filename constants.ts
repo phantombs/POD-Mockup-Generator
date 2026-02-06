@@ -81,7 +81,7 @@ export const DESIGN_ASSET_CONFIG: MockupConfig = {
     Art Style: ${style.artStyle}. 
     Colors: ${style.colors}. 
     Mood: ${style.mood}.
-    Technical Constraint: SOLID WHITE BACKGROUND ONLY. NO GRADIENTS on background. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style suitable for direct-to-garment (DTG) printing.`;
+    Technical Constraint: TRANSPARENT BACKGROUND (.png format). NO background elements. The output must be a clean graphic with full transparency. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style suitable for direct-to-garment (DTG) printing.`;
   }
 };
 

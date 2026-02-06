@@ -1,16 +1,46 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
+import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES, ALL_CONFIGS, NICHES, DESIGN_STYLES, COLOR_PALETTES } from './constants';
 import { GeneratedImage, GenerationStatus, DesignStrategy, DesignAsset, StrategySuggestion, ProductListingContent, ApiKey, TrendingSlogan, ImageModel, ImageSize } from './types';
-import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt, generateFiveDesignConcepts, generateProductListingContent, generateSloganSuggestions, refineProductListingContent } from './services/geminiService';
+import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt, generateFiveDesignConcepts, generateProductListingContent, generateSloganSuggestions, refineProductListingContent, analyzeAndSuggestDesigns } from './services/geminiService';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ImageCard from './components/ImageCard';
 import DesignAssetCard from './components/DesignAssetCard';
-// FIX: Import Sparkles icon.
-import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X, Tags, Trash2, PlusCircle, CheckCircle, Info, Wand2, Sparkles } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X, Tags, Trash2, PlusCircle, CheckCircle, Info, Wand2, Sparkles, UploadCloud, Copy, Image as ImageIcon, Crop as CropIcon, Type as TypeIcon } from 'lucide-react';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function getCroppedImg(image: HTMLImageElement, crop: PixelCrop): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        const scaleX = image.naturalWidth / image.width;
+        const scaleY = image.naturalHeight / image.height;
+        canvas.width = crop.width * scaleX;
+        canvas.height = crop.height * scaleY;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+            reject(new Error('No 2d context'));
+            return;
+        }
+
+        ctx.drawImage(
+            image,
+            crop.x * scaleX,
+            crop.y * scaleY,
+            crop.width * scaleX,
+            crop.height * scaleY,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+        resolve(canvas.toDataURL('image/png'));
+    });
+}
 
 const App: React.FC = () => {
   const [images, setImages] = useState<GeneratedImage[]>(INITIAL_IMAGES);
@@ -54,6 +84,14 @@ const App: React.FC = () => {
   const [isThinkingMode, setIsThinkingMode] = useState(false);
   const [imageModel, setImageModel] = useState<ImageModel>('gemini-2.5-flash-image');
   const [imageSize, setImageSize] = useState<ImageSize>('1K');
+  const [isRedesignModalOpen, setIsRedesignModalOpen] = useState(false);
+  const [isAnalyzingRedesign, setIsAnalyzingRedesign] = useState(false);
+  const [redesignPreviewImage, setRedesignPreviewImage] = useState<string | null>(null);
+  const [redesignError, setRedesignError] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const redesignImgRef = useRef<HTMLImageElement>(null);
+  const [redesignDescription, setRedesignDescription] = useState('');
 
   // Trend Spy State
   const [isTrendSpyModalOpen, setIsTrendSpyModalOpen] = useState(false);
@@ -90,6 +128,46 @@ const App: React.FC = () => {
       console.error("Failed to load API keys from localStorage", error);
     }
   }, []);
+
+  const handleGlobalPaste = useCallback((event: ClipboardEvent) => {
+    const target = event.target as HTMLElement;
+    const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+    
+    if (isRedesignModalOpen || isKeyManagerOpen || isVideoPromptModalOpen || isListingModalOpen || isTrendSpyModalOpen || isTyping) {
+        return;
+    }
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            if (!blob) continue;
+
+            event.preventDefault();
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Image = e.target?.result as string;
+                if (base64Image) {
+                    handleOpenRedesignModal();
+                    setRedesignPreviewImage(base64Image);
+                    setRedesignError(null);
+                }
+            };
+            reader.readAsDataURL(blob);
+            return;
+        }
+    }
+  }, [isRedesignModalOpen, isKeyManagerOpen, isVideoPromptModalOpen, isListingModalOpen, isTrendSpyModalOpen]);
+
+  useEffect(() => {
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => {
+        document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [handleGlobalPaste]);
   
   const resetAppState = () => {
     setStatus(GenerationStatus.IDLE);
@@ -230,7 +308,7 @@ const App: React.FC = () => {
       for (const asset of initialAssets) {
         try {
             const template = DESIGN_ASSET_CONFIG.template(slogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
-            const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, 'gemini-2.5-flash-image', '1K'));
+            const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, 'gemini-3-pro-image-preview', '4K', '3:4'));
             
             setDesignAssets(prev => prev.map(a => 
               a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
@@ -249,13 +327,60 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAnalyzeAndRedesign = async (imageBase64: string, description: string) => {
+    setIsAnalyzingRedesign(true);
+    setIsRedesignModalOpen(false);
+    resetAppState();
+    setStatus(GenerationStatus.GENERATING_5_ASSETS);
+
+    try {
+        const topConcepts = await runWithApiKeyRotation(key => analyzeAndSuggestDesigns(imageBase64, description, key));
+        
+        const initialAssets: DesignAsset[] = topConcepts.map((concept, index) => ({
+            id: `design-${index}`,
+            imageUrl: null,
+            loading: true,
+            error: null,
+            strategy: concept
+        }));
+        setDesignAssets(initialAssets);
+        
+        for (const asset of initialAssets) {
+            try {
+                const placeholderSlogan = asset.strategy.title; 
+                const template = DESIGN_ASSET_CONFIG.template(placeholderSlogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
+                const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, 'gemini-3-pro-image-preview', '4K', '3:4'));
+                
+                setDesignAssets(prev => prev.map(a => 
+                  a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
+                ));
+            } catch (error: any) {
+                console.error(`Failed to generate design asset ${asset.id}:`, error);
+                handleError(error, asset.id);
+            }
+            await sleep(2000);
+        }
+        setStatus(GenerationStatus.REVIEW_5_ASSETS);
+    } catch (e: any) {
+        handleError(e);
+    } finally {
+        setIsAnalyzingRedesign(false);
+    }
+  };
+
   const handleSelectDesign = (assetId: string) => {
     setSelectedDesignAssetId(assetId);
+    const selectedAsset = designAssets.find(asset => asset.id === assetId);
+    if (selectedAsset) {
+        if (!currentSlogan) {
+            setCurrentSlogan(selectedAsset.strategy.title);
+        }
+    }
   };
 
   const generateSingleMockup = async (configId: string, prompt: string, referenceImage: string) => {
     try {
-      const base64Url = await runWithApiKeyRotation(key => generateMockupImage(prompt, key, imageModel, imageSize, referenceImage));
+      const base64Url = await runWithApiKeyRotation(key => generateMockupImage(prompt, key, imageModel, imageSize, "1:1", referenceImage));
       setImages(prev => prev.map(img => img.configId === configId ? { ...img, loading: false, imageUrl: base64Url, error: null } : img));
     } catch (error: any) {
       const errorMessage = error.message || 'An unknown error occurred.';
@@ -416,8 +541,87 @@ const App: React.FC = () => {
     }
   };
 
+  const handleOpenRedesignModal = () => {
+    setRedesignPreviewImage(null);
+    setRedesignError(null);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    setRedesignDescription('');
+    setIsRedesignModalOpen(true);
+  };
+
+  const handleRedesignFileChange = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { // 4MB limit
+        setRedesignError("Image size cannot exceed 4MB.");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        setRedesignPreviewImage(reader.result as string);
+        setRedesignError(null);
+        setCrop(undefined);
+        setCompletedCrop(undefined);
+    };
+    reader.onerror = () => {
+        setRedesignError("Failed to read the image file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRedesignPaste = async () => {
+    try {
+        setRedesignError(null);
+        const permission = await navigator.permissions.query({ name: 'clipboard-read' as PermissionName });
+        if (permission.state === 'denied') {
+            throw new Error('Not allowed to read clipboard.');
+        }
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+                const blob = await item.getType(imageType);
+                const reader = new FileReader();
+                reader.onload = () => {
+                    setRedesignPreviewImage(reader.result as string);
+                    setCrop(undefined);
+                    setCompletedCrop(undefined);
+                };
+                reader.readAsDataURL(blob);
+                return;
+            }
+        }
+        setRedesignError("No image found on clipboard.");
+    } catch (error: any) {
+        setRedesignError(`Paste failed: ${error.message}`);
+    }
+  };
+
+  const handleCropAndAnalyze = async () => {
+    if (completedCrop?.width && completedCrop?.height && redesignImgRef.current) {
+      try {
+        const croppedImageBase64 = await getCroppedImg(redesignImgRef.current, completedCrop);
+        handleAnalyzeAndRedesign(croppedImageBase64, redesignDescription);
+      } catch (e) {
+        console.error('Cropping failed', e);
+        setRedesignError('Could not crop the image. Please try again.');
+      }
+    } else {
+      setRedesignError('Please select an area to crop first.');
+    }
+  };
+
+  function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { width, height } = e.currentTarget;
+    setCrop(centerCrop(
+      makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+      width,
+      height
+    ));
+  }
+
   const getStatusText = () => {
-    if (status === GenerationStatus.GENERATING_5_ASSETS) return "AI is generating 3 concepts...";
+    if (status === GenerationStatus.GENERATING_5_ASSETS) return isAnalyzingRedesign ? "AI is analyzing your image..." : "AI is generating 3 concepts...";
     if (status === GenerationStatus.GENERATING_MOCKUPS) return "Generating all your mockups...";
     if (status === GenerationStatus.ANALYZING) return "AI Strategist is thinking...";
     return "Processing...";
@@ -443,7 +647,6 @@ const App: React.FC = () => {
             setCurrentAudience={setCurrentAudience}
             isThinkingMode={isThinkingMode}
             setIsThinkingMode={setIsThinkingMode}
-            // Trend Spy Props
             onOpenTrendSpy={handleOpenTrendSpy}
             isTrendSpyModalOpen={isTrendSpyModalOpen}
             setIsTrendSpyModalOpen={setIsTrendSpyModalOpen}
@@ -456,6 +659,7 @@ const App: React.FC = () => {
             setSearchTimeframe={setSearchTimeframe}
             copiedText={copiedText}
             handleCopyTrendText={handleCopyTrendText}
+            onOpenRedesignModal={handleOpenRedesignModal}
          />
       </div>
 
@@ -489,7 +693,7 @@ const App: React.FC = () => {
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
             <div className="text-center mb-8">
                 <h2 className="text-3xl font-extrabold text-white">Step 1: Choose Your Winning Concept</h2>
-                <p className="text-slate-400 mt-1">The AI has generated 3 concepts based on top market trends. Select one to continue.</p>
+                <p className="text-slate-400 mt-1">The AI has generated 3 concepts. Select one to continue.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {designAssets.map(asset => (
@@ -594,6 +798,83 @@ const App: React.FC = () => {
                         ))}
                       </ul>
                     )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {isRedesignModalOpen && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl flex flex-col">
+                <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+                    <div className='flex items-center gap-2'> <ImageIcon className="w-5 h-5 text-indigo-400" /> <h3 className="text-lg font-bold text-white">Redesign Image</h3> </div>
+                    <button onClick={() => setIsRedesignModalOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors"> <X className="w-5 h-5 text-slate-400" /> </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="w-full min-h-[300px] rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-center p-1 bg-slate-900/50">
+                    {redesignPreviewImage ? (
+                      <ReactCrop
+                        crop={crop}
+                        onChange={c => setCrop(c)}
+                        onComplete={c => setCompletedCrop(c)}
+                        aspect={1}
+                        className="max-h-full"
+                      >
+                        <img ref={redesignImgRef} src={redesignPreviewImage} onLoad={onImageLoad} alt="Crop preview" style={{ maxHeight: '60vh' }}/>
+                      </ReactCrop>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-10 h-10 text-slate-500 mb-2" />
+                        <p className="text-slate-300 font-semibold">Drag & drop an image here</p>
+                        <p className="text-slate-500 text-xs mt-1">or use the buttons below</p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {redesignPreviewImage && (
+                    <div className="relative">
+                        <label className="block text-xs text-slate-400 font-semibold mb-1 ml-1">Describe the design (or enter a quote)</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={redesignDescription}
+                                onChange={(e) => setRedesignDescription(e.target.value)}
+                                placeholder="e.g., 'Cosmic Cat', a funny cat in space..."
+                                className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm pl-10"
+                            />
+                            <TypeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        </div>
+                    </div>
+                  )}
+
+                  {redesignError && <p className="text-sm text-rose-400 text-center">{redesignError}</p>}
+                  
+                  {!redesignPreviewImage && (
+                    <div className="flex gap-4">
+                        <label className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors cursor-pointer">
+                          <UploadCloud className="w-4 h-4" />
+                          <span>Upload File</span>
+                          <input type="file" accept="image/png, image/jpeg, image/webp" className="hidden" onChange={(e) => handleRedesignFileChange(e.target.files ? e.target.files[0] : null)} />
+                        </label>
+                        <button onClick={handleRedesignPaste} className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors">
+                          <Copy className="w-4 h-4" />
+                          <span>Paste Image</span>
+                        </button>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t border-slate-700 flex items-center justify-between">
+                    <p className="text-xs text-slate-400 flex items-center gap-2">
+                        <CropIcon className="w-4 h-4" />
+                        <span>Select the main design, then add a description.</span>
+                    </p>
+                    <button 
+                        onClick={handleCropAndAnalyze}
+                        disabled={!completedCrop?.width || !completedCrop?.height || isAnalyzingRedesign}
+                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {isAnalyzingRedesign ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                        Analyze & Redesign
+                    </button>
                 </div>
             </div>
         </div>

@@ -17,26 +17,26 @@ export const generateSloganSuggestions = async (audience: string, topic: string,
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are a professional Market Intelligence Analyst specializing in the Print-on-Demand (POD) industry.
-
-      **MISSION:** Your primary mission is to use the Google Search tool to find and analyze trending POD slogans/designs that have shown a significant increase in search volume, social media engagement, or sales within a specific timeframe. You are a "trend spy."
+      contents: `You are an elite Print-on-Demand (POD) Market Intelligence Analyst. You are an expert at reverse-engineering viral success on platforms like Etsy, Amazon Merch, TikTok, and Pinterest.
+      Your mission is to simulate the research process of a top-tier POD seller to identify slogans with the highest commercial potential right now.
 
       **SEARCH PARAMETERS:**
       - **Target Audience:** "${audience || 'a general audience with a sense of humor'}"
       - **Niche / Topic:** "${topic || 'general funny and relatable topics'}"
       - **Timeframe for Analysis:** "${timeframe}"
 
-      **MANDATORY RULES & PROTOCOL:**
-      1.  **TIME-SENSITIVE ANALYSIS:** Your analysis and results MUST be strictly based on the popularity of the slogan within the specified **Timeframe for Analysis**. Do not provide evergreen or generally popular slogans unless they are currently surging.
-      2.  **PROVIDE RATIONALE:** For each slogan, you must provide a 'rationale' (in Vietnamese) that explains *why* it is trending *within the specified timeframe*. For example, is it related to a recent event, a new meme, a TikTok trend, or a seasonal holiday?
-      3.  **GENERATE CLEAN SEARCH TERM:** Provide a concise, effective 'suggestedSearchTerm' (in English) that a user can copy-paste into a marketplace (like Etsy, Amazon) to find real-world examples.
-      4.  **SEARCH TERM FORMATTING:** The search term MUST ONLY contain the product description or slogan. It MUST NOT include website names.
-          - **Correct:** "spill the tea sweatshirt"
-          - **Incorrect:** "spill the tea sweatshirt etsy"
-      5.  **LANGUAGE SPECIFICATION:**
-          - 'slogan' and 'suggestedSearchTerm' MUST be in **English**.
-          - 'rationale' MUST be in **Vietnamese**.
-      6.  **OUTPUT FORMAT:** The output must be ONLY a JSON array of up to 10 objects, strictly adhering to the specified schema.
+      **MANDATORY Multi-Platform Commercial Viability Analysis:**
+      1.  **Simulate Marketplace Research:** Perform Google searches that mimic queries on Etsy or Amazon to find what is *actually selling*. Use search terms like: \`"[niche] shirt bestseller"\`, \`"[topic] popular now gift"\`, \`"funny [topic] etsy reviews"\`.
+      2.  **Simulate Social Media Listening:** Perform searches to identify related visual trends, memes, and sounds on platforms like TikTok and Pinterest. Use search terms like: \`"[topic] aesthetic pinterest"\`, \`"funny [niche] TikTok trend"\`.
+      3.  **Cross-Reference & Identify Patterns:** Analyze the search results from both steps. Give the highest priority to slogans and concepts that appear across **both** e-commerce bestseller lists and social media trends. This cross-platform validation is the strongest signal of a winning trend.
+      4.  **Extract & Refine Slogans:** From the identified winning patterns, extract the core, repeatable slogan that is short, witty, and easy to read on a shirt.
+
+      **OUTPUT RULES & FORMATTING:**
+      - **TIME-SENSITIVE:** Your results MUST be strictly based on popularity within the specified **Timeframe**.
+      - **PROVIDE DEEP RATIONALE:** Your 'rationale' (in Vietnamese) MUST be specific and reference the type of data found (e.g., "Spotted on several Etsy Bestseller t-shirts and linked to a current TikTok meme"). This proves you followed the analysis protocol.
+      - **GENERATE SEARCH TERM:** Provide a concise, effective 'suggestedSearchTerm' (in English) for finding real-world product examples. The term MUST NOT include website names (e.g., "spill the tea sweatshirt" is correct).
+      - **LANGUAGE:** 'slogan' and 'suggestedSearchTerm' MUST be in **English**. 'rationale' MUST be in **Vietnamese**.
+      - **FINAL OUTPUT:** The output must be ONLY a JSON array of up to 10 objects, strictly adhering to the specified schema.
       `,
       config: {
         tools: [{googleSearch: {}}],
@@ -47,7 +47,7 @@ export const generateSloganSuggestions = async (audience: string, topic: string,
             type: Type.OBJECT,
             properties: {
               slogan: { type: Type.STRING, description: "A witty and short slogan, in English." },
-              rationale: { type: Type.STRING, description: "Analysis of *why* this is trending within the specified timeframe, in Vietnamese." },
+              rationale: { type: Type.STRING, description: "Specific analysis of *why* this is trending, citing marketplaces or social media, in Vietnamese." },
               suggestedSearchTerm: { type: Type.STRING, description: "A concise and effective search query (in English) to find real products. Must not contain site names." },
             },
             required: ["slogan", "rationale", "suggestedSearchTerm"]
@@ -150,6 +150,99 @@ export const generateFiveDesignConcepts = async (slogan: string, audience: strin
   }
 };
 
+export const analyzeAndSuggestDesigns = async (imageBase64: string, description: string, apiKey: string | null): Promise<StrategySuggestion[]> => {
+  const ai = getApiClient(apiKey);
+  try {
+    const nicheOptions = NICHES.map(n => `ID: "${n.id}", Label: "${n.label}"`).join('\n');
+    const styleOptions = DESIGN_STYLES.map(s => `ID: "${s.id}", Label: "${s.label}", Context: "${s.context}"`).join('\n');
+    const colorOptions = COLOR_PALETTES.map(c => `ID: "${c.id}", Label: "${c.label}", Context: "${c.context}"`).join('\n');
+
+    const imagePart = {
+      inlineData: {
+        mimeType: 'image/png',
+        data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
+      },
+    };
+
+    const textPart = {
+      text: `You are an expert Print-on-Demand (POD) market trend analyst and a creative director.
+      Your task is to analyze the provided user-submitted design image and its accompanying description. Your goal is to generate 3 NEW, commercially improved, and distinct design concepts.
+      
+      **IMPORTANT:**
+      - The **IMAGE** provides the visual *style* to be inspired by (e.g., retro, minimalist, watercolor).
+      - The **USER'S DESCRIPTION** provides the core *theme, subject, or exact text/quote* to use. You MUST adhere to the user's description for the content. Do NOT just copy the original image's subject if the user provides a new one.
+
+      **User's Description/Keywords:** "${description || 'No description provided. Analyze the image for theme.'}"
+
+      **Task: Generate 3 New Concepts:**
+      Based on your analysis, generate an array of 3 unique concept objects. Each concept should be a fresh take on the original theme, aimed at maximizing commercial appeal.
+
+      **Language Rules:**
+      - The 'title' must be in **English**.
+      - The 'rationale' and all 'designStyle' properties MUST be in **Vietnamese**.
+
+      **Available Options (You MUST return one ID from each category for each of the 3 strategies):**
+      
+      **Target Niches:**
+      ${nicheOptions}
+
+      **Visual Trends:**
+      ${styleOptions}
+
+      **Color Palettes:**
+      ${colorOptions}
+
+      **Instructions:**
+      1.  Generate an array of 3 unique and diverse concept objects.
+      2.  For each object, select the single best ID from the Niches, Visual Trends, and Color Palettes lists.
+      3.  Provide a short, catchy 'title' in English (e.g., "Cosmic Kitty", "Retro Sunset Explorer"). This title should be suitable as a replacement for a slogan. If the user provided a quote, the title can be inspired by it.
+      4.  Provide a brief 'rationale' IN VIETNAMESE explaining why this new strategy will sell better.
+      5.  Crucially, for each object, also provide a detailed 'designStyle' object containing specific creative direction IN VIETNAMESE: 'typography', 'artStyle', 'colors', and 'mood'.
+      `
+    };
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: { parts: [textPart, imagePart] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: "A short, catchy title for the strategy, in English. This will act as the new slogan." },
+              nicheId: { type: Type.STRING },
+              styleId: { type: Type.STRING },
+              colorId: { type: Type.STRING },
+              rationale: { type: Type.STRING, description: "Your reasoning for choosing this new strategy, in Vietnamese." },
+              designStyle: {
+                type: Type.OBJECT,
+                properties: {
+                  typography: { type: Type.STRING }, artStyle: { type: Type.STRING }, colors: { type: Type.STRING }, mood: { type: Type.STRING },
+                },
+                required: ["typography", "artStyle", "colors", "mood"]
+              }
+            },
+            required: ["title", "nicheId", "styleId", "colorId", "rationale", "designStyle"]
+          }
+        }
+      }
+    });
+
+    if (response.text) {
+      const suggestions = JSON.parse(response.text) as StrategySuggestion[];
+      if (suggestions.length > 3) return suggestions.slice(0, 3);
+      return suggestions;
+    }
+    throw new Error("No new design concepts generated from the image.");
+  } catch (error) {
+    console.error("Error analyzing image and suggesting designs:", error);
+    throw error;
+  }
+};
+
+
 export const generateDesignStrategy = async (
   slogan: string, 
   niche: string, 
@@ -220,6 +313,7 @@ export const generateMockupImage = async (
     apiKey: string | null, 
     model: ImageModel, 
     imageSize: ImageSize,
+    aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "1:1",
     referenceImageBase64?: string | null
 ): Promise<string> => {
   const MAX_RETRIES = 3;
@@ -236,7 +330,7 @@ export const generateMockupImage = async (
         });
       }
       
-      const config: any = { imageConfig: { aspectRatio: "1:1" } };
+      const config: any = { imageConfig: { aspectRatio: aspectRatio } };
       if (model === 'gemini-3-pro-image-preview') {
           config.imageConfig.imageSize = imageSize;
           config.tools = [{google_search: {}}];
