@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, VideoGenerationReferenceImage, VideoGenerationReferenceType } from "@google/genai";
+import { GoogleGenAI, Type, VideoGenerationReferenceImage, VideoGenerationReferenceType, ThinkingLevel } from "@google/genai";
 import { DesignStrategy, StrategySuggestion, TrendingSlogan, ProductListingContent, ImageModel, ImageSize } from "../types";
 import { NICHES, DESIGN_STYLES, COLOR_PALETTES } from "../constants";
 
@@ -17,40 +17,39 @@ export const generateSloganSuggestions = async (audience: string, topic: string,
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are an elite Print-on-Demand (POD) Market Intelligence Analyst. You are an expert at reverse-engineering viral success on platforms like Etsy, Amazon Merch, TikTok, and Pinterest.
-      Your mission is to simulate the research process of a top-tier POD seller to identify slogans with the highest commercial potential right now.
-
-      **SEARCH PARAMETERS:**
-      - **Target Audience:** "${audience || 'a general audience with a sense of humor'}"
-      - **Niche / Topic:** "${topic || 'general funny and relatable topics'}"
-      - **Timeframe for Analysis:** "${timeframe}"
-
-      **MANDATORY Multi-Platform Commercial Viability Analysis:**
-      1.  **Simulate Marketplace Research:** Perform Google searches that mimic queries on Etsy or Amazon to find what is *actually selling*. Use search terms like: \`"[niche] shirt bestseller"\`, \`"[topic] popular now gift"\`, \`"funny [topic] etsy reviews"\`.
-      2.  **Simulate Social Media Listening:** Perform searches to identify related visual trends, memes, and sounds on platforms like TikTok and Pinterest. Use search terms like: \`"[topic] aesthetic pinterest"\`, \`"funny [niche] TikTok trend"\`.
-      3.  **Cross-Reference & Identify Patterns:** Analyze the search results from both steps. Give the highest priority to slogans and concepts that appear across **both** e-commerce bestseller lists and social media trends. This cross-platform validation is the strongest signal of a winning trend.
-      4.  **Extract & Refine Slogans:** From the identified winning patterns, extract the core, repeatable slogan that is short, witty, and easy to read on a shirt.
-
-      **OUTPUT RULES & FORMATTING:**
-      - **TIME-SENSITIVE:** Your results MUST be strictly based on popularity within the specified **Timeframe**.
-      - **PROVIDE DEEP RATIONALE:** Your 'rationale' (in Vietnamese) MUST be specific and reference the type of data found (e.g., "Spotted on several Etsy Bestseller t-shirts and linked to a current TikTok meme"). This proves you followed the analysis protocol.
-      - **GENERATE SEARCH TERM:** Provide a concise, effective 'suggestedSearchTerm' (in English) for finding real-world product examples. The term MUST NOT include website names (e.g., "spill the tea sweatshirt" is correct).
-      - **LANGUAGE:** 'slogan' and 'suggestedSearchTerm' MUST be in **English**. 'rationale' MUST be in **Vietnamese**.
-      - **FINAL OUTPUT:** The output must be ONLY a JSON array of up to 10 objects, strictly adhering to the specified schema.
-      `,
+      contents: `Find trending POD slogans for:
+      - Audience: "${audience || 'General US'}"
+      - Topic: "${topic || 'Trending lifestyle'}"
+      - Timeframe: "${timeframe}"`,
       config: {
+        systemInstruction: `You are a legendary 7-figure Print-on-Demand (POD) entrepreneur and Market Intelligence Expert.
+        Your expertise lies in identifying "micro-trends" before they go mainstream on platforms like Etsy US, Amazon Merch, Pinterest, and TikTok.
+        
+        **EXPERT ANALYSIS PROTOCOL:**
+        1. Marketplace Pulse: Search for bestsellers in the US.
+        2. IP SAFETY CHECK: You MUST avoid any slogans related to Brands, Logos, Celebrities, or Trademarked Phrases.
+        3. Evergreen Niche Focus: Prioritize Nature, Professions, Hobbies, and Original Humor.
+        
+        OUTPUT RULES:
+        - slogan: Short, punchy, correctly spelled US English.
+        - rationale: Detailed expert analysis in Vietnamese.
+        - suggestedSearchTerm: Precise English query for US marketplaces.
+        - Return a JSON array of objects.`,
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              slogan: { type: Type.STRING, description: "A witty and short slogan, in English." },
-              rationale: { type: Type.STRING, description: "Specific analysis of *why* this is trending, citing marketplaces or social media, in Vietnamese." },
-              suggestedSearchTerm: { type: Type.STRING, description: "A concise and effective search query (in English) to find real products. Must not contain site names." },
+              slogan: { type: Type.STRING },
+              rationale: { type: Type.STRING },
+              suggestedSearchTerm: { type: Type.STRING },
+              traffic: { type: Type.STRING },
+              conversionRate: { type: Type.STRING },
             },
-            required: ["slogan", "rationale", "suggestedSearchTerm"]
+            required: ["slogan", "rationale", "suggestedSearchTerm", "traffic", "conversionRate"]
           }
         }
       }
@@ -84,16 +83,31 @@ export const generateFiveDesignConcepts = async (slogan: string, audience: strin
             nicheId: { type: Type.STRING },
             styleId: { type: Type.STRING },
             colorId: { type: Type.STRING },
-            rationale: { type: Type.STRING, description: "Your reasoning for choosing this strategy, citing market trends, in Vietnamese." },
+            rationale: { type: Type.STRING, description: "Your reasoning for choosing this strategy and product mix, in Vietnamese." },
             designStyle: {
               type: Type.OBJECT,
               properties: {
                 typography: { type: Type.STRING }, artStyle: { type: Type.STRING }, colors: { type: Type.STRING }, mood: { type: Type.STRING },
               },
               required: ["typography", "artStyle", "colors", "mood"]
+            },
+            recommendedMockups: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  productId: { type: Type.STRING },
+                  productName: { type: Type.STRING },
+                  rationale: { type: Type.STRING, description: "Why this product fits the audience (in Vietnamese)" },
+                  prompt: { type: Type.STRING, description: "Detailed prompt for mockup generation (in English)" }
+                },
+                required: ["productId", "productName", "rationale", "prompt"]
+              },
+              minItems: 5,
+              maxItems: 8
             }
           },
-          required: ["title", "nicheId", "styleId", "colorId", "rationale", "designStyle"]
+          required: ["title", "nicheId", "styleId", "colorId", "rationale", "designStyle", "recommendedMockups"]
         }
       }
     };
@@ -105,37 +119,36 @@ export const generateFiveDesignConcepts = async (slogan: string, audience: strin
 
     const response = await ai.models.generateContent({
       model: model,
-      contents: `You are an expert Print-on-Demand (POD) market trend analyst and a creative director.
-      Your task is to analyze the provided slogan and target audience, then generate the top 3 most commercially viable and distinct design concepts.
-      For each concept, you must provide both a high-level strategy and a specific creative direction.
-      ${isThinkingMode ? "You MUST use Google Search to research current trends related to the slogan and audience to ensure your concepts are fresh, relevant, and have a high chance of viral success." : ""}
+      contents: `You are a legendary 7-figure POD entrepreneur and Creative Director specializing in the US market. 
+      Your goal is to transform a slogan into 3 distinct, high-converting design concepts and select the most appropriate Redbubble products for each.
 
-      **Slogan (in English):** "${slogan}"
-      **Target Audience:** "${audience || 'General public'}"
+      **Slogan:** "${slogan}"
+      **Target Audience:** "${audience || 'US Consumers'}"
+
+      **EXPERT ANALYSIS PROTOCOL:**
+      1. **Audience Habits:** Analyze the target audience's shopping habits and lifestyle. Where do they spend time? What do they buy?
+      2. **Product Strategy:** Select 5 to 8 Redbubble-supported products that have the highest conversion potential for this specific niche and audience.
+      3. **Visual Direction:** Ensure the design style and color palette are perfectly aligned with the audience's aesthetic preferences.
+
+      **REDBUBBLE SUPPORTED PRODUCTS (Choose 5-8):**
+      - Standard T-Shirt, Graphic T-Shirt, Hoodie, Sweatshirt, Die-cut Sticker, iPhone Case, Samsung Case, Poster, Canvas Print, Throw Pillow, Ceramic Mug, Tote Bag, Drawstring Bag, Spiral Notebook, Hardcover Journal, Baseball Cap, Dad Hat, Greeting Card, Tapestry.
 
       **Language Rules:**
-      - The 'title' must be in **English**.
-      - The 'rationale' and all 'designStyle' properties MUST be in **Vietnamese**.
+      - 'title', 'productId', 'productName', 'prompt' in **English**.
+      - 'rationale' and 'designStyle' properties in **Vietnamese**, explaining the commercial logic.
 
-      **Available Options (You MUST return one ID from each category for each of the 3 strategies):**
-      
+      **Available Options:**
       **Target Niches:**
       ${nicheOptions}
-
       **Visual Trends:**
       ${styleOptions}
-
       **Color Palettes:**
       ${colorOptions}
-
-      **Instructions:**
-      1.  Generate an array of 3 unique and diverse concept objects.
-      2.  For each object, select the single best ID from the Niches, Visual Trends, and Color Palettes lists.
-      3.  Provide a short, catchy 'title' in English (e.g., "Retro Gamer Vibe", "Minimalist Zen").
-      4.  Provide a brief 'rationale' IN VIETNAMESE explaining why this strategy will sell.
-      5.  Crucially, for each object, also provide a detailed 'designStyle' object containing specific creative direction IN VIETNAMESE: 'typography', 'artStyle', 'colors', and 'mood'.
       `,
-      config: config
+      config: {
+        ...config,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+      }
     });
 
     if (response.text) {
@@ -206,6 +219,7 @@ export const analyzeAndSuggestDesigns = async (imageBase64: string, description:
       contents: { parts: [textPart, imagePart] },
       config: {
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -333,7 +347,7 @@ export const generateMockupImage = async (
       const config: any = { imageConfig: { aspectRatio: aspectRatio } };
       if (model === 'gemini-3-pro-image-preview') {
           config.imageConfig.imageSize = imageSize;
-          config.tools = [{google_search: {}}];
+          config.tools = [{googleSearch: {}}];
       }
 
       const response = await ai.models.generateContent({
@@ -382,7 +396,7 @@ export const generatePromoVideo = async (slogan: string, strategy: DesignStrateg
       mimeType: 'image/png',
     };
     
-    const videoCtx = strategy.mockups.video || { music: "upbeat electronic", style: "fast-paced", transitions: "quick cuts" };
+    const videoCtx = { music: "upbeat electronic", style: "fast-paced", transitions: "quick cuts" };
 
     const prompt = `Create a short, dynamic, promotional video for a new product line with the slogan "${slogan}". 
     Video Style: ${videoCtx.style}, with ${videoCtx.transitions}. 
@@ -466,6 +480,9 @@ export const generateVideoPrompt = async (
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: { parts: [textPart, ...imageParts] },
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+      }
     });
 
     if (response.text) {
@@ -489,24 +506,28 @@ export const generateProductListingContent = async (
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are an expert E-commerce SEO and Print-on-Demand (POD) Merchandiser. Your goal is to create highly effective, keyword-rich product listings that are optimized for discoverability on free traffic platforms like Etsy, Redbubble, and Amazon Merch.
+      contents: `You are an expert E-commerce SEO and POD Merchandiser specializing in **Etsy US and Amazon Merch**. 
+      Your goal is to create a product listing that dominates search results and converts US shoppers.
 
-      **TASK:** Generate a product listing for a design based on the following information. The output language MUST be **English**.
+      **Listing Requirements (Redbubble Optimized):**
+      1.  **Title (SEO):** Keyword-rich, descriptive, starts with the main slogan. Max 140 characters. No brand names or celebrities.
+      2.  **Description (Conversion):** Persuasive US English tone. Focus on "Benefits" and "Giftability".
+      3.  **Tags (Redbubble Algorithm):** 
+          - **Quantity:** Exactly 10-15 tags.
+          - **Structure:** Include Main Keyword, Style (e.g., Watercolor, Minimalist), Target Audience (e.g., Dog Mom), and Detailed Description.
+          - **NO SPAM:** No irrelevant tags. No brand names.
+          - **NO REPETITION:** Do not repeat words in tags (e.g., use "Cute", "Funny", "Cat" instead of "Cute cat", "Funny cat"). The system combines them automatically.
 
-      - **Main Slogan/Text on Design:** "${slogan}"
-      - **Target Niche:** ${niche}
-      - **Target Audience:** ${targetAudience}
-      - **Overall Mood/Style of the Design:** ${designMood}
+      - **Slogan:** "${slogan}"
+      - **Niche:** ${niche}
+      - **Audience:** ${targetAudience}
+      - **Mood:** ${designMood}
 
-      **OUTPUT REQUIREMENTS:**
-      1.  **Title:** Create a compelling, SEO-friendly title. Start with the core slogan, then add relevant keywords about the niche, audience, and product type (e.g., "Funny T-Shirt", "Gift for X", "Sarcastic Mug").
-      2.  **Description:** Write a short, engaging paragraph. Describe the design and who it would be a perfect gift for. Weave in long-tail keywords naturally. Use persuasive language.
-      3.  **Tags:** Provide a list of 13-15 of the most relevant, high-traffic keywords and tags. Include a mix of broad and specific terms. Think about what a customer would search for to find this exact product.
-
-      The entire output must be a single, valid JSON object following the specified schema.
+      The output language MUST be **English**.
       `,
       config: {
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -553,6 +574,7 @@ export const refineProductListingContent = async (
             `,
             config: {
                 responseMimeType: "application/json",
+                thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
                 responseSchema: {
                   type: Type.OBJECT,
                   properties: {

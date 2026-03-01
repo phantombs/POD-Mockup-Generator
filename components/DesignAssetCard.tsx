@@ -44,7 +44,19 @@ const DesignAssetCard: React.FC<DesignAssetCardProps> = ({ asset, isSelected, on
       </div>
 
       <div className="p-3 border-t border-slate-700">
-        <h4 className="text-sm font-bold text-white truncate" title={asset.strategy.title}>{asset.strategy.title}</h4>
+        <div className="flex justify-between items-start gap-2">
+          <h4 className="text-sm font-bold text-white truncate flex-1" title={asset.strategy.title}>{asset.strategy.title}</h4>
+          {asset.strategy.recommendedMockups && (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm">
+                Print-Ready
+              </span>
+              <span className="text-[10px] font-bold bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
+                {asset.strategy.recommendedMockups.length} Mockups
+              </span>
+            </div>
+          )}
+        </div>
         <p className="text-xs text-slate-400 truncate" title={asset.strategy.rationale}>{asset.strategy.rationale}</p>
       </div>
 

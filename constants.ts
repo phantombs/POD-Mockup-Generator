@@ -4,11 +4,13 @@ export const NICHES = [
   { id: 'general', label: 'General / Lifestyle' },
   { id: 'fitness', label: 'Fitness & Gym' },
   { id: 'gaming', label: 'Gaming & Geek Culture' },
-  { id: 'pets', label: 'Pets (Cats/Dogs)' },
-  { id: 'outdoors', label: 'Outdoors & Adventure' },
-  { id: 'funny', label: 'Funny / Sarcastic' },
-  { id: 'inspirational', label: 'Inspirational / Spiritual' },
-  { id: 'work', label: 'Work / Hustle Culture' },
+  { id: 'pets', label: 'Pets (Dog Mom / Cat Dad)' },
+  { id: 'outdoors', label: 'National Parks & Adventure' },
+  { id: 'funny', label: 'Sarcastic / Snarky' },
+  { id: 'professions', label: 'Professions (Nurse, Teacher, Trucker)' },
+  { id: 'family', label: 'Family (Grandma, New Dad, Siblings)' },
+  { id: 'hustle', label: 'Work / Hustle Culture' },
+  { id: 'holidays', label: 'Seasonal / US Holidays' },
   { id: 'custom', label: 'Custom / Other (Type your own)' },
 ];
 
@@ -28,39 +30,34 @@ export const DESIGN_STYLES = [
     context: 'Analyze the slogan and niche to determine the most commercially viable artistic style automatically based on current POD trends.' 
   },
   { 
-    id: 'quiet-activism', 
-    label: 'Quiet Activism (Minimalist)', 
-    context: 'Style: Clean, bold sans-serif or typewriter fonts, significant negative space. Focus on legible, impactful text. High contrast, minimalist aesthetic common on TikTok/Pinterest.' 
+    id: 'retro-wavy', 
+    label: 'Retro Wavy / Groovy', 
+    context: 'Style: 70s inspired wavy typography, thick outlines, warm retro colors (mustard, terracotta, teal). High demand on Etsy for "Mama" and "Teacher" niches.' 
   },
   { 
-    id: 'ai-futuristic', 
-    label: 'AI / Futuristic Art', 
-    context: 'Style: Y2K tech nostalgia, metallic/chrome textures, glitch effects, neon highlights, liquid metal fonts, and futuristic cyber-core motifs.' 
+    id: 'distressed-vintage', 
+    label: 'Distressed Vintage', 
+    context: 'Style: Weathered, cracked textures, muted colors, collegiate fonts. Evokes a "thrifted" look popular in US collegiate and outdoor niches.' 
   },
   { 
-    id: 'nature-eco', 
-    label: 'Nature / Eco (Solar-Punk)', 
-    context: 'Style: Intricate botanical line art, mushrooms, celestial bodies, solar-punk influence, muted earthy palettes, and organic, sustainable vibes.' 
+    id: 'minimalist-line-art', 
+    label: 'Minimalist Line Art', 
+    context: 'Style: Single-line drawings, abstract faces, botanical elements, clean serif fonts. High-end aesthetic for home decor and apparel.' 
   },
   { 
-    id: 'fantasy-escapism', 
-    label: 'Fantasy / Escapism', 
-    context: 'Style: Ethereal lighting, dreamy landscapes, mythical creatures, vibrant magical colors, surreal compositions that evoke a sense of wonder.' 
+    id: 'bold-typography', 
+    label: 'Bold Statement Typography', 
+    context: 'Style: Massive, heavy sans-serif fonts, often stacked or arched. Focus is 100% on the message. High visibility for political or social statements.' 
   },
   { 
-    id: 'pixel-art', 
-    label: '8-Bit / Pixel Art', 
-    context: 'Style: Retro gaming arcade aesthetic, low-resolution pixelated graphics, bright 8-bit color palette, nostalgic 90s console vibes.' 
+    id: 'kawaii-cute', 
+    label: 'Kawaii / Pastel Pop', 
+    context: 'Style: Adorable characters, soft pastel colors, bubbly fonts. Popular for Gen Z and "soft girl" aesthetics.' 
   },
   { 
-    id: 'quirky-diy', 
-    label: 'Quirky DIY (Hand-Drawn)', 
-    context: 'Style: Playful doodles, pencil/crayon textures, irregular lines, charmingly imperfect "human touch" designs popular for personalized gifts.' 
-  },
-  { 
-    id: 'color-blocking', 
-    label: 'Color-Blocking / Bold Graphics', 
-    context: 'Style: Large geometric shapes, high-contrast clashing colors, brutalist layout, pop-art influence, maximalist and eye-catching composition.' 
+    id: 'brutalist-tech', 
+    label: 'Brutalist / Cyber-Core', 
+    context: 'Style: Raw, unpolished, industrial fonts, metallic textures, high contrast, glitch art. Popular in gaming and tech-wear.' 
   }
 ];
 
@@ -76,12 +73,20 @@ export const DESIGN_ASSET_CONFIG: MockupConfig = {
       mood: "Modern"
     };
     
-    return `Create a high-quality POD design asset for: "${slogan}".
+    return `Create a professional, high-resolution PRINT-READY design asset for: "${slogan}".
     Typography: ${style.typography}. 
     Art Style: ${style.artStyle}. 
     Colors: ${style.colors}. 
     Mood: ${style.mood}.
-    Technical Constraint: TRANSPARENT BACKGROUND (.png format). NO background elements. The output must be a clean graphic with full transparency. Centered composition. The design must be clean, with no small stray pixels. Text must be perfectly legible and correctly spelled. Professional merchandise illustration style suitable for direct-to-garment (DTG) printing.`;
+    
+    CRITICAL TECHNICAL SPECS:
+    1. ISOLATED ON TRANSPARENT BACKGROUND: The graphic must be perfectly isolated with NO background, NO shadows, and NO gradients behind it.
+    2. HIGH DEFINITION: Sharp edges, clean lines, suitable for large format printing (5000px+ quality).
+    3. RGB COLOR SPACE: Vibrant and accurate colors.
+    4. COMPOSITION: Centered, balanced, and professional.
+    5. NO MOCKUPS: Do not show the design on a shirt or any product. Just the raw graphic.
+    
+    This is for a Print-on-Demand (POD) master file. The quality must be elite.`;
   }
 };
 
@@ -90,62 +95,40 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
     id: 'tshirt-mockup',
     title: '2. Lifestyle T-Shirt',
     description: 'Design on a premium heavy cotton t-shirt.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.tshirt || {
-        model: "A stylish young adult",
-        environment: "Urban street background",
-        lighting: "Golden hour lighting"
-      };
-      
-      return `Professional product photography of a premium t-shirt featuring the design from the reference image (quote: "${slogan}"). Model: ${ctx.model}. Environment: ${ctx.environment}. Lighting: ${ctx.lighting}. The t-shirt is the focus, high detail on fabric texture.`;
+    template: (slogan) => {
+      return `Professional product photography of a premium t-shirt featuring the design from the reference image (quote: "${slogan}"). Model: A stylish young adult. Environment: Urban street background. Lighting: Golden hour lighting. The t-shirt is the focus, high detail on fabric texture.`;
     }
   },
   {
     id: 'phonecase-mockup',
     title: '3. Premium Phone Case',
     description: 'Sleek impact-resistant phone case.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.phoneCase || {
-        surface: "Modern glass desk",
-        props: "A cup of coffee and a notebook"
-      };
-      return `A high-end studio shot of a premium glossy phone case featuring the design from the reference (quote: "${slogan}"). Surface: ${ctx.surface}. Props: ${ctx.props}. Dramatic soft lighting, Apple-style aesthetic.`;
+    template: (slogan) => {
+      return `A high-end studio shot of a premium glossy phone case featuring the design from the reference (quote: "${slogan}"). Surface: Modern glass desk. Props: A cup of coffee and a notebook. Dramatic soft lighting, Apple-style aesthetic.`;
     }
   },
   {
     id: 'poster-mockup',
     title: '4. Framed Wall Art',
     description: 'Minimalist framed poster for home decor.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.poster || {
-        room: "Scandinavian living room",
-        style: "Minimalist black frame"
-      };
-      return `A lifestyle photo of a large framed vertical poster on a wall. The poster shows the design from the reference (quote: "${slogan}"). Room: ${ctx.room}. Frame Style: ${ctx.style}. Natural light coming from a window.`;
+    template: (slogan) => {
+      return `A lifestyle photo of a large framed vertical poster on a wall. The poster shows the design from the reference (quote: "${slogan}"). Room: Scandinavian living room. Frame Style: Minimalist black frame. Natural light coming from a window.`;
     }
   },
   {
     id: 'cap-mockup',
     title: '5. Embroidered Cap',
     description: 'Classic baseball cap with embroidered logo.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.cap || {
-        style: "Vintage dad hat",
-        setting: "Outdoor park bench"
-      };
-      return `Close-up shot of a high-quality cotton baseball cap featuring the design from the reference as an embroidered patch (quote: "${slogan}"). Style: ${ctx.style}. Setting: ${ctx.setting}. Focus on embroidery texture and stitching.`;
+    template: (slogan) => {
+      return `Close-up shot of a high-quality cotton baseball cap featuring the design from the reference as an embroidered patch (quote: "${slogan}"). Style: Vintage dad hat. Setting: Outdoor park bench. Focus on embroidery texture and stitching.`;
     }
   },
   {
     id: 'mug-mockup',
     title: '6. Desk & Home Mug',
     description: '11oz ceramic mug in a cozy setting.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.mug || {
-        setting: "Modern minimalist kitchen",
-        props: "Steam rising from the mug"
-      };
-      return `A high-end studio shot of a white ceramic mug displaying the graphic from the reference (quote: "${slogan}"). Setting: ${ctx.setting}. Props: ${ctx.props}. 8k resolution, commercial look.`;
+    template: (slogan) => {
+      return `A high-end studio shot of a white ceramic mug displaying the graphic from the reference (quote: "${slogan}"). Setting: Modern minimalist kitchen. Props: Steam rising from the mug. 8k resolution, commercial look.`;
     }
   },
   {
@@ -160,12 +143,8 @@ export const PRODUCT_MOCKUP_CONFIGS: MockupConfig[] = [
     id: 'pillow-mockup',
     title: '8. Accent Throw Pillow',
     description: 'Square decorative pillow for sofas.',
-    template: (slogan, strategy) => {
-      const ctx = strategy?.mockups?.pillow || {
-        setting: "Velvet navy sofa",
-        colors: "Cozy warm tones"
-      };
-      return `A lifestyle interior photo of a square throw pillow featuring the design from the reference (quote: "${slogan}"). Setting: ${ctx.setting}. Lighting: Warm and cozy. Professional interior design photography.`;
+    template: (slogan) => {
+      return `A lifestyle interior photo of a square throw pillow featuring the design from the reference (quote: "${slogan}"). Setting: Velvet navy sofa. Lighting: Warm and cozy. Professional interior design photography.`;
     }
   },
   {

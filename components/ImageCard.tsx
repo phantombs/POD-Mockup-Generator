@@ -40,7 +40,7 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, onRetry }) => {
             <AlertCircle className="w-10 h-10 text-rose-500 mb-2" />
             <p className="text-rose-200 text-sm mb-4 break-words">{image.error}</p>
             <button
-              onClick={() => onRetry(image.configId)}
+              onClick={() => onRetry(image.id)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-white transition-colors"
             >
               <RefreshCw className="w-3 h-3" /> Try Again
@@ -69,7 +69,7 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, onRetry }) => {
         {image.imageUrl && !image.loading && (
           <div className="flex gap-2">
             <button
-              onClick={() => onRetry(image.configId)}
+              onClick={() => onRetry(image.id)}
               className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-600"
               title="Regenerate this image"
             >

@@ -30,6 +30,8 @@ interface PromptInputProps {
   onOpenRedesignModal: () => void;
 }
 
+type SortCriteria = 'default' | 'traffic' | 'cr';
+
 const PromptInput: React.FC<PromptInputProps> = ({ 
   onGenerate, isGenerating, statusText,
   currentSlogan, setCurrentSlogan, currentAudience, setCurrentAudience,
@@ -38,6 +40,8 @@ const PromptInput: React.FC<PromptInputProps> = ({
   handleSearchTrends, trendResults, searchTopic, setSearchTopic, searchTimeframe,
   setSearchTimeframe, copiedText, handleCopyTrendText, onOpenRedesignModal
 }) => {
+  const [sortCriteria, setSortCriteria] = React.useState<SortCriteria>('default');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentSlogan.trim()) {
@@ -169,26 +173,80 @@ const PromptInput: React.FC<PromptInputProps> = ({
 
             <div className="p-2 sm:p-4 overflow-y-auto">
               {isSearchingTrends && (<div className='flex flex-col items-center justify-center text-center py-16'><Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" /><p className="text-white font-semibold">AI is analyzing market data...</p><p className="text-slate-400 text-sm">This may take a moment.</p></div> )}
-              {trendResults && !isSearchingTrends && (
-                trendResults.length > 0 ? (
-                  <ul className="space-y-3">
-                    {trendResults.map((item, index) => (
-                      <li key={index} className="animate-in fade-in-50 duration-500">
-                        <div className="w-full text-left p-4 bg-slate-900/50 rounded-lg border border-slate-700/50">
-                          <button onClick={() => handleSelectSlogan(item.slogan)} className="w-full text-left group">
-                            <p className="font-bold text-white text-base group-hover:text-indigo-400 transition-colors"> <span className="text-indigo-400 font-black mr-2 text-lg">{index + 1}.</span> {item.slogan} </p>
-                          </button>
-                          <div className="flex items-start gap-2 mt-2 pl-6"> <Lightbulb className="w-4 h-4 text-amber-400/80 flex-shrink-0 mt-0.5" /> <p className="text-sm text-slate-400">{item.rationale}</p> </div>
-                          <div className="flex items-center justify-between mt-3 pl-6 gap-2">
-                            <div className="flex items-center gap-2 flex-1 min-w-0"> <Search className="w-4 h-4 text-sky-400/80 flex-shrink-0" /> <p className="text-xs text-slate-400 truncate select-all" title={item.suggestedSearchTerm}> {item.suggestedSearchTerm} </p> </div>
-                            <button onClick={(e) => { e.stopPropagation(); handleCopyTrendText(item.suggestedSearchTerm); }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors flex-shrink-0"> <Copy className="w-3 h-3" /> <span>{copiedText === item.suggestedSearchTerm ? 'Copied!' : 'Copy Term'}</span> </button>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : ( <div className='flex flex-col items-center justify-center text-center py-16'> <Search className="w-8 h-8 text-slate-500 mb-4" /> <p className="text-white font-semibold">No specific trends found</p> <p className="text-slate-400 text-sm">Try a broader topic or a different timeframe.</p> </div> )
-              )}
+              
+              {trendResults && !isSearchingTrends && (() => {
+                const sortedResults = [...trendResults].sort((a, b) => {
+                  if (sortCriteria === 'traffic') {
+                    const getTrafficScore = (t: string) => {
+                      const lower = t.toLowerCase();
+                      if (lower.includes('very high')) return 4;
+                      if (lower.includes('high')) return 3;
+                      if (lower.includes('medium')) return 2;
+                      return 1;
+                    };
+                    return getTrafficScore(b.traffic) - getTrafficScore(a.traffic);
+                  }
+                  if (sortCriteria === 'cr') {
+                    const getCR = (cr: string) => parseFloat(cr) || (cr.toLowerCase().includes('high') ? 5 : 0);
+                    return getCR(b.conversionRate) - getCR(a.conversionRate);
+                  }
+                  return 0;
+                });
+
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-4 px-2">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Top Trending Slogans</p>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-500">Sort by:</label>
+                        <select 
+                          value={sortCriteria} 
+                          onChange={(e) => setSortCriteria(e.target.value as SortCriteria)}
+                          className="bg-slate-900 text-slate-300 text-xs border border-slate-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="default">Default</option>
+                          <option value="traffic">Traffic (High to Low)</option>
+                          <option value="cr">Conversion Rate (High to Low)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {sortedResults.length > 0 ? (
+                      <ul className="space-y-3">
+                        {sortedResults.map((item, index) => (
+                          <li key={index} className="animate-in fade-in-50 duration-500">
+                            <div className="w-full text-left p-4 bg-slate-900/50 rounded-lg border border-slate-700/50 hover:border-indigo-500/30 transition-all">
+                              <div className="flex justify-between items-start gap-4">
+                                <button onClick={() => handleSelectSlogan(item.slogan)} className="text-left group flex-1">
+                                  <p className="font-bold text-white text-base group-hover:text-indigo-400 transition-colors"> 
+                                    <span className="text-indigo-400 font-black mr-2 text-lg">{index + 1}.</span> {item.slogan} 
+                                  </p>
+                                </button>
+                                <div className="flex flex-col items-end gap-1">
+                                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500/10 rounded border border-indigo-500/20">
+                                    <Search className="w-3 h-3 text-indigo-400" />
+                                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-tight">Traffic: {item.traffic}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">
+                                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-tight">CR: {item.conversionRate}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-start gap-2 mt-2 pl-6"> <Lightbulb className="w-4 h-4 text-amber-400/80 flex-shrink-0 mt-0.5" /> <p className="text-sm text-slate-400">{item.rationale}</p> </div>
+                              <div className="flex items-center justify-between mt-3 pl-6 gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0"> <Search className="w-4 h-4 text-sky-400/80 flex-shrink-0" /> <p className="text-xs text-slate-400 truncate select-all" title={item.suggestedSearchTerm}> {item.suggestedSearchTerm} </p> </div>
+                                <button onClick={(e) => { e.stopPropagation(); handleCopyTrendText(item.suggestedSearchTerm); }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors flex-shrink-0"> <Copy className="w-3 h-3" /> <span>{copiedText === item.suggestedSearchTerm ? 'Copied!' : 'Copy Term'}</span> </button>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : ( <div className='flex flex-col items-center justify-center text-center py-16'> <Search className="w-8 h-8 text-slate-500 mb-4" /> <p className="text-white font-semibold">No specific trends found</p> <p className="text-slate-400 text-sm">Try a broader topic or a different timeframe.</p> </div> )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

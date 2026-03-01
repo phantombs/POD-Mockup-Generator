@@ -1,5 +1,12 @@
 
 
+export interface MockupRecommendation {
+  productId: string;
+  productName: string;
+  rationale: string;
+  prompt: string;
+}
+
 export interface DesignStrategy {
   designStyle: {
     typography: string;
@@ -7,17 +14,7 @@ export interface DesignStrategy {
     colors: string;
     mood: string;
   };
-  mockups: {
-    tshirt: { model: string; environment: string; lighting: string };
-    mug: { setting: string; props: string };
-    sticker: { surface: string; lighting: string };
-    phoneCase: { surface: string; props: string };
-    poster: { room: string; style: string };
-    cap: { style: string; setting: string };
-    pillow: { setting: string; colors: string };
-    composite: { arrangement: string; theme: string };
-    video: { music: string; style: string; transitions: string };
-  };
+  recommendedMockups: MockupRecommendation[];
 }
 
 export interface MockupConfig {
@@ -58,6 +55,7 @@ export interface StrategySuggestion {
     colors: string;
     mood: string;
   };
+  recommendedMockups: MockupRecommendation[];
 }
 
 export interface DesignAsset {
@@ -72,6 +70,8 @@ export interface TrendingSlogan {
   slogan: string;
   rationale: string;
   suggestedSearchTerm: string;
+  traffic: string;
+  conversionRate: string;
 }
 
 export interface ProductListingContent {

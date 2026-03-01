@@ -10,6 +10,15 @@ import ImageCard from './components/ImageCard';
 import DesignAssetCard from './components/DesignAssetCard';
 import { CheckCircle2, RefreshCw, Download, Loader2, BrainCircuit, Key, AlertCircle, Film, ExternalLink, FileText, Clipboard, X, Tags, Trash2, PlusCircle, CheckCircle, Info, Wand2, Sparkles, UploadCloud, Copy, Image as ImageIcon, Crop as CropIcon, Type as TypeIcon } from 'lucide-react';
 
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function getCroppedImg(image: HTMLImageElement, crop: PixelCrop): Promise<string> {
@@ -79,6 +88,7 @@ const App: React.FC = () => {
 
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [keySwitchNotification, setKeySwitchNotification] = useState<string | null>(null);
+  const [hasPlatformKey, setHasPlatformKey] = useState(false);
   
   // New Feature States
   const [isThinkingMode, setIsThinkingMode] = useState(false);
@@ -190,6 +200,31 @@ const App: React.FC = () => {
     setKeySwitchNotification(null);
   };
 
+  useEffect(() => {
+    const checkPlatformKey = async () => {
+      try {
+        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setHasPlatformKey(hasKey);
+        }
+      } catch (e) {
+        console.error("Failed to check platform API key", e);
+      }
+    };
+    checkPlatformKey();
+  }, []);
+
+  const handleOpenPlatformKeySelector = async () => {
+    try {
+      if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+        await window.aistudio.openSelectKey();
+        setHasPlatformKey(true);
+      }
+    } catch (e) {
+      console.error("Failed to open platform key selector", e);
+    }
+  };
+
   const handleAddApiKey = () => {
     if (newApiKeyInput.trim() && !apiKeys.some(k => k.key === newApiKeyInput.trim())) {
       const newKey: ApiKey = { id: `key-${Date.now()}`, key: newApiKeyInput.trim() };
@@ -258,12 +293,18 @@ const App: React.FC = () => {
         if (keySwitchNotification) setKeySwitchNotification(null);
         return result;
       } catch (error: any) {
-        const errorMessage = error.message || '';
+        const errorMessage = error.message || JSON.stringify(error) || '';
         const isQuotaError = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED');
+        const isPermissionError = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
   
         if (isQuotaError) {
           console.warn(`Quota exceeded for key ${maskApiKey(key.key)}. Trying next key...`);
           triedKeyIds.add(key.id);
+        } else if (isPermissionError) {
+          if (key.id === 'default') {
+            throw new Error("Default API key does not have permission for this model. Please connect a paid Google Cloud project in the Key Manager.");
+          }
+          throw new Error(`API key ${maskApiKey(key.key)} does not have permission for this model. Please ensure it has access to the requested model.`);
         } else {
           throw error;
         }
@@ -308,7 +349,8 @@ const App: React.FC = () => {
       for (const asset of initialAssets) {
         try {
             const template = DESIGN_ASSET_CONFIG.template(slogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
-            const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, 'gemini-3-pro-image-preview', '4K', '3:4'));
+            // Use selected model and size for the master design asset
+            const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
             
             setDesignAssets(prev => prev.map(a => 
               a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
@@ -349,7 +391,8 @@ const App: React.FC = () => {
             try {
                 const placeholderSlogan = asset.strategy.title; 
                 const template = DESIGN_ASSET_CONFIG.template(placeholderSlogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
-                const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, 'gemini-3-pro-image-preview', '4K', '3:4'));
+                // Use selected model and size for the master design asset
+                const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
                 
                 setDesignAssets(prev => prev.map(a => 
                   a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
@@ -398,23 +441,49 @@ const App: React.FC = () => {
     setGlobalError(null);
     setKeySwitchNotification(null);
     
-    const finalImages: GeneratedImage[] = ALL_CONFIGS.map(config => ({
-      id: config.id, configId: config.id, title: config.title,
-      imageUrl: config.id === DESIGN_ASSET_CONFIG.id ? selectedAsset.imageUrl : null,
-      loading: config.id !== DESIGN_ASSET_CONFIG.id, error: null,
-    }));
+    // Use the dynamic recommendations from the selected strategy
+    const recommendations = selectedAsset.strategy.recommendedMockups || [];
+    
+    const finalImages: GeneratedImage[] = [
+      {
+        id: DESIGN_ASSET_CONFIG.id,
+        configId: DESIGN_ASSET_CONFIG.id,
+        title: DESIGN_ASSET_CONFIG.title,
+        imageUrl: selectedAsset.imageUrl,
+        loading: false,
+        error: null,
+      },
+      ...recommendations.map((rec, idx) => ({
+        id: `mockup-${idx}`,
+        configId: rec.productId,
+        title: rec.productName,
+        imageUrl: null,
+        loading: true,
+        error: null,
+      }))
+    ];
     setImages(finalImages);
 
     try {
-        const nicheObj = NICHES.find(n => n.id === selectedAsset.strategy.nicheId) || NICHES[0];
-        const styleObj = DESIGN_STYLES.find(s => s.id === selectedAsset.strategy.styleId) || DESIGN_STYLES[0];
-        const colorObj = COLOR_PALETTES.find(c => c.id === selectedAsset.strategy.colorId) || COLOR_PALETTES[0];
+        // We no longer need to call generateDesignStrategy here as it's already in the asset
+        setDesignStrategy({
+          designStyle: selectedAsset.strategy.designStyle,
+          recommendedMockups: recommendations
+        });
         
-        const detailedStrategy = await runWithApiKeyRotation(key => generateDesignStrategy(currentSlogan, nicheObj.label, styleObj.context, currentAudience, colorObj.context, key));
-        setDesignStrategy(detailedStrategy);
-        
-        for (const config of PRODUCT_MOCKUP_CONFIGS) {
-          await generateSingleMockup(config.id, config.template(currentSlogan, detailedStrategy), selectedAsset.imageUrl!);
+        for (let i = 0; i < recommendations.length; i++) {
+          const rec = recommendations[i];
+          const mockupId = `mockup-${i}`;
+          
+          try {
+            const base64Url = await runWithApiKeyRotation(key => 
+              generateMockupImage(rec.prompt, key, imageModel, imageSize, "1:1", selectedAsset.imageUrl!)
+            );
+            setImages(prev => prev.map(img => img.id === mockupId ? { ...img, loading: false, imageUrl: base64Url, error: null } : img));
+          } catch (error: any) {
+            const errorMessage = error.message || 'An unknown error occurred.';
+            setImages(prev => prev.map(img => img.id === mockupId ? { ...img, loading: false, error: errorMessage } : img));
+          }
           await sleep(2000);
         }
     } catch (e: any) {
@@ -428,9 +497,9 @@ const App: React.FC = () => {
     setVideoUrl(null);
     setVideoError(null);
     try {
-      const referenceImageIds = ['tshirt-mockup', 'hoodie-mockup', 'phonecase-mockup'];
-      const referenceImages = images.filter(img => referenceImageIds.includes(img.configId) && img.imageUrl).map(img => img.imageUrl!);
-      if (referenceImages.length < 1) throw new Error("At least one successful mockup (T-shirt, Hoodie, or Phone Case) is needed to generate a video.");
+      // Use any successful mockup image as reference
+      const referenceImages = images.filter(img => img.id.startsWith('mockup-') && img.imageUrl).map(img => img.imageUrl!);
+      if (referenceImages.length < 1) throw new Error("At least one successful mockup is needed to generate a video.");
       const url = await runWithApiKeyRotation(key => generatePromoVideo(currentSlogan, designStrategy, referenceImages, key));
       setVideoUrl(url);
     } catch (error: any) {
@@ -477,18 +546,62 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const isMockupsLoading = images.filter(i => i.configId !== DESIGN_ASSET_CONFIG.id).some(img => img.loading);
-    if (!isMockupsLoading && status === GenerationStatus.GENERATING_MOCKUPS) { setStatus(GenerationStatus.COMPLETED); }
+    if (!isMockupsLoading && status === GenerationStatus.GENERATING_MOCKUPS) { 
+      setStatus(GenerationStatus.COMPLETED); 
+      
+      // Auto-generate SEO Content and Video Script when mockups are done
+      const autoGenerateContent = async () => {
+        const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
+        const niche = NICHES.find(n => n.id === selectedAsset?.strategy.nicheId)?.label || 'General';
+        
+        if (designStrategy && currentSlogan && niche) {
+          // 1. Auto-generate SEO Listing
+          setIsGeneratingListing(true);
+          try {
+            const content = await runWithApiKeyRotation(key => generateProductListingContent(
+              currentSlogan, niche, currentAudience, designStrategy.designStyle.mood, key
+            ));
+            setProductListing(content);
+          } catch (e) { console.error("Auto SEO generation failed", e); }
+          finally { setIsGeneratingListing(false); }
+
+          // 2. Auto-generate Video Script
+          const successfulMockups = images.filter(img => img.imageUrl && img.id.startsWith('mockup-')).map(img => img.imageUrl!);
+          if (successfulMockups.length > 0) {
+            setIsVideoPromptGenerating(true);
+            try {
+              const prompt = await runWithApiKeyRotation(key => generateVideoPrompt(currentSlogan, niche, currentAudience, designStrategy, successfulMockups, key));
+              setVideoPrompt(prompt);
+            } catch (e) { console.error("Auto Video Script generation failed", e); }
+            finally { setIsVideoPromptGenerating(false); }
+          }
+        }
+      };
+      autoGenerateContent();
+    }
   }, [images, status]);
 
-  const handleRetry = async (configId: string) => {
+  const handleRetry = async (imageId: string) => {
     if (status === GenerationStatus.REVIEW_5_ASSETS) { alert("To retry a concept, please use the 'Start Over' button for a fresh set of concepts."); return; }
-    if (configId === DESIGN_ASSET_CONFIG.id) return;
+    if (imageId === DESIGN_ASSET_CONFIG.id) return;
+    
     const selectedAsset = designAssets.find(asset => asset.id === selectedDesignAssetId);
-    if (selectedAsset?.imageUrl && designStrategy && currentSlogan) {
-      const config = PRODUCT_MOCKUP_CONFIGS.find(c => c.id === configId);
-      if (config) {
-        setImages(prev => prev.map(img => img.configId === configId ? { ...img, loading: true, error: null } : img));
-        await generateSingleMockup(config.id, config.template(currentSlogan, designStrategy), selectedAsset.imageUrl);
+    if (selectedAsset?.imageUrl && designStrategy) {
+      // Find the recommendation for this image
+      const mockupIndex = parseInt(imageId.split('-')[1]);
+      const rec = designStrategy.recommendedMockups[mockupIndex];
+      
+      if (rec) {
+        setImages(prev => prev.map(img => img.id === imageId ? { ...img, loading: true, error: null } : img));
+        try {
+          const base64Url = await runWithApiKeyRotation(key => 
+            generateMockupImage(rec.prompt, key, imageModel, imageSize, "1:1", selectedAsset.imageUrl!)
+          );
+          setImages(prev => prev.map(img => img.id === imageId ? { ...img, loading: false, imageUrl: base64Url, error: null } : img));
+        } catch (error: any) {
+          const errorMessage = error.message || 'An unknown error occurred.';
+          setImages(prev => prev.map(img => img.id === imageId ? { ...img, loading: false, error: errorMessage } : img));
+        }
       }
     }
   };
@@ -498,9 +611,33 @@ const App: React.FC = () => {
     const zip = new JSZip();
     const folder = zip.folder(`pod-assets-${Date.now()}`);
     if (folder) {
-      const sortedImages = [...images].sort((a, b) => { const indexA = ALL_CONFIGS.findIndex(c => c.id === a.configId); const indexB = ALL_CONFIGS.findIndex(c => c.id === b.configId); return indexA - indexB; });
-      sortedImages.forEach(img => { if (img.imageUrl) { const sanitizedTitle = img.title.replace(/\s/g, '_').replace(/[&/()]/g, ''); folder.file(`${sanitizedTitle}.png`, img.imageUrl.split(',')[1], { base64: true }); } });
-      if (videoUrl) { try { const response = await fetch(videoUrl); const blob = await response.blob(); folder.file('promo_video.mp4', blob); } catch (e) { console.error("Could not add video to zip", e); } }
+      const sortedImages = [...images];
+      sortedImages.forEach(img => { 
+        if (img.imageUrl) { 
+          const sanitizedTitle = img.title.replace(/\s/g, '_').replace(/[&/()]/g, ''); 
+          folder.file(`${sanitizedTitle}.png`, img.imageUrl.split(',')[1], { base64: true }); 
+        } 
+      });
+      
+      if (videoUrl) { 
+        try { 
+          const response = await fetch(videoUrl); 
+          const blob = await response.blob(); 
+          folder.file('promo_video.mp4', blob); 
+        } catch (e) { console.error("Could not add video to zip", e); } 
+      }
+
+      // Add SEO Content
+      if (productListing) {
+        const seoText = `TITLE: ${productListing.title}\n\nDESCRIPTION:\n${productListing.description}\n\nTAGS:\n${productListing.tags.join(', ')}`;
+        folder.file('seo_listing_content.txt', seoText);
+      }
+
+      // Add Video Script
+      if (videoPrompt) {
+        folder.file('video_script_prompt.txt', videoPrompt);
+      }
+
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
@@ -517,7 +654,16 @@ const App: React.FC = () => {
     setIsSearchingTrends(true);
     setTrendResults(null);
     try {
-      const suggestions = await runWithApiKeyRotation(key => generateSloganSuggestions(currentAudience, searchTopic, searchTimeframe, key));
+      // Add a 60-second timeout to prevent indefinite hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Trend analysis timed out. Please try a more specific topic.")), 60000)
+      );
+      
+      const suggestions = await Promise.race([
+        runWithApiKeyRotation(key => generateSloganSuggestions(currentAudience, searchTopic, searchTimeframe, key)),
+        timeoutPromise
+      ]) as TrendingSlogan[];
+      
       setTrendResults(suggestions || []);
     } catch (error: any) {
       alert(error.message || "Sorry, the AI analyst is busy. Please try again.");
@@ -778,7 +924,39 @@ const App: React.FC = () => {
                     <button onClick={() => setIsKeyManagerOpen(false)} className="p-1 rounded-full hover:bg-slate-700 transition-colors"> <X className="w-5 h-5 text-slate-400" /> </button>
                 </div>
                 <div className="p-4 space-y-4">
-                  <p className="text-xs text-slate-400">Keys are stored locally. For best results, add keys from different Google Cloud projects.</p>
+                  <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 mb-4">
+                    <h4 className="text-sm font-bold text-indigo-300 mb-1 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" /> Paid Model Access
+                    </h4>
+                    <p className="text-xs text-slate-400 mb-3">To use Gemini 3 Pro Image or Veo Video models, you must connect a paid Google Cloud project.</p>
+                    <button 
+                      onClick={handleOpenPlatformKeySelector}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${hasPlatformKey ? 'bg-green-600/20 text-green-400 border border-green-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20'}`}
+                    >
+                      {hasPlatformKey ? <><CheckCircle className="w-4 h-4" /> Project Connected</> : <><ExternalLink className="w-4 h-4" /> Connect Paid Project</>}
+                    </button>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="block text-[10px] text-slate-500 mt-2 hover:text-slate-400 underline text-center">Learn about Gemini API billing</a>
+                  </div>
+
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                    <h4 className="text-[11px] font-bold text-amber-400 mb-1 flex items-center gap-2">
+                      <Info className="w-3.5 h-3.5" /> Mẹo cho tài khoản Miễn phí
+                    </h4>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Bạn có thể thêm <b>nhiều API Key</b> từ các tài khoản Google khác nhau. Ứng dụng sẽ tự động xoay vòng (Rotate) để tránh lỗi giới hạn lượt gọi (Rate Limit). Nên dùng model <b>Flash Image</b> cho Key miễn phí.
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-slate-700"></div>
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-2 bg-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Or Use Custom Keys</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400">Custom keys are stored locally. Use these if you have your own API keys.</p>
                   <div className="flex gap-2">
                     <input type="text" value={newApiKeyInput} onChange={(e) => setNewApiKeyInput(e.target.value)} placeholder="Enter new API Key..." className="flex-grow bg-slate-900 text-white px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"/>
                     <button onClick={handleAddApiKey} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-colors text-sm"><PlusCircle className="w-4 h-4"/> Add Key</button>
