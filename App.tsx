@@ -4,6 +4,7 @@ import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from
 import { DESIGN_ASSET_CONFIG, PRODUCT_MOCKUP_CONFIGS, INITIAL_IMAGES, ALL_CONFIGS, NICHES, DESIGN_STYLES, COLOR_PALETTES } from './constants';
 import { GeneratedImage, GenerationStatus, DesignStrategy, DesignAsset, StrategySuggestion, ProductListingContent, ApiKey, TrendingSlogan, ImageModel, ImageSize } from './types';
 import { generateMockupImage, generateDesignStrategy, generatePromoVideo, generateVideoPrompt, generateFiveDesignConcepts, generateProductListingContent, generateSloganSuggestions, refineProductListingContent, analyzeAndSuggestDesigns } from './services/geminiService';
+import { aiRemoveBackground } from './src/lib/imageUtils';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ImageCard from './components/ImageCard';
@@ -301,10 +302,11 @@ const App: React.FC = () => {
           console.warn(`Quota exceeded for key ${maskApiKey(key.key)}. Trying next key...`);
           triedKeyIds.add(key.id);
         } else if (isPermissionError) {
+          const guidance = " Please ensure you have enabled the 'Generative AI API' (or 'Vertex AI API' if using Google Cloud) in your Google Cloud Console / AI Studio settings.";
           if (key.id === 'default') {
-            throw new Error("Default API key does not have permission for this model. Please connect a paid Google Cloud project in the Key Manager.");
+            throw new Error("Default API key does not have permission for this model." + guidance + " Please connect a paid Google Cloud project in the Key Manager.");
           }
-          throw new Error(`API key ${maskApiKey(key.key)} does not have permission for this model. Please ensure it has access to the requested model.`);
+          throw new Error(`API key ${maskApiKey(key.key)} does not have permission for this model.` + guidance);
         } else {
           throw error;
         }
@@ -350,10 +352,20 @@ const App: React.FC = () => {
         try {
             const template = DESIGN_ASSET_CONFIG.template(slogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
             // Use selected model and size for the master design asset
-            const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
+            let imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
             
+            // Auto AI Remove Background for Design Assets
+            try {
+              setDesignAssets(prev => prev.map(a => 
+                a.id === asset.id ? { ...a, isRemovingBg: true } : a
+              ));
+              imageUrl = await aiRemoveBackground(imageUrl);
+            } catch (bgError) {
+              console.error("Background removal failed, using original image:", bgError);
+            }
+
             setDesignAssets(prev => prev.map(a => 
-              a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
+              a.id === asset.id ? { ...a, loading: false, isRemovingBg: false, imageUrl: imageUrl, error: null } : a
             ));
         } catch (error: any) {
             console.error(`Failed to generate design asset ${asset.id}:`, error);
@@ -392,10 +404,20 @@ const App: React.FC = () => {
                 const placeholderSlogan = asset.strategy.title; 
                 const template = DESIGN_ASSET_CONFIG.template(placeholderSlogan, { designStyle: asset.strategy.designStyle } as DesignStrategy);
                 // Use selected model and size for the master design asset
-                const imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
+                let imageUrl = await runWithApiKeyRotation(key => generateMockupImage(template, key, imageModel, imageModel === 'gemini-3-pro-image-preview' ? '4K' : '1K', '1:1'));
                 
+                // Auto AI Remove Background for Design Assets
+                try {
+                  setDesignAssets(prev => prev.map(a => 
+                    a.id === asset.id ? { ...a, isRemovingBg: true } : a
+                  ));
+                  imageUrl = await aiRemoveBackground(imageUrl);
+                } catch (bgError) {
+                  console.error("Background removal failed, using original image:", bgError);
+                }
+
                 setDesignAssets(prev => prev.map(a => 
-                  a.id === asset.id ? { ...a, loading: false, imageUrl: imageUrl, error: null } : a
+                  a.id === asset.id ? { ...a, loading: false, isRemovingBg: false, imageUrl: imageUrl, error: null } : a
                 ));
             } catch (error: any) {
                 console.error(`Failed to generate design asset ${asset.id}:`, error);
@@ -408,6 +430,27 @@ const App: React.FC = () => {
         handleError(e);
     } finally {
         setIsAnalyzingRedesign(false);
+    }
+  };
+
+  const handleRemoveBackground = async (assetId: string) => {
+    const asset = designAssets.find(a => a.id === assetId);
+    if (!asset?.imageUrl) return;
+
+    setDesignAssets(prev => prev.map(a => 
+      a.id === assetId ? { ...a, isRemovingBg: true } : a
+    ));
+
+    try {
+      const newImageUrl = await aiRemoveBackground(asset.imageUrl);
+      setDesignAssets(prev => prev.map(a => 
+        a.id === assetId ? { ...a, imageUrl: newImageUrl, isRemovingBg: false } : a
+      ));
+    } catch (error) {
+      console.error("Manual background removal failed:", error);
+      setDesignAssets(prev => prev.map(a => 
+        a.id === assetId ? { ...a, isRemovingBg: false } : a
+      ));
     }
   };
 
@@ -848,6 +891,7 @@ const App: React.FC = () => {
                   asset={asset} 
                   isSelected={selectedDesignAssetId === asset.id}
                   onSelect={handleSelectDesign}
+                  onRemoveBg={handleRemoveBackground}
                 />
               ))}
             </div>
@@ -966,11 +1010,42 @@ const App: React.FC = () => {
                     {apiKeys.length === 0 ? ( <p className='text-sm text-slate-500 text-center py-8'>No API keys added yet.</p> ) : (
                       <ul className="space-y-2">
                         {apiKeys.map(k => (
-                          <li key={k.id} className="flex items-center justify-between p-2 bg-slate-900/50 rounded-lg">
-                            <span className="font-mono text-sm text-slate-300">{maskApiKey(k.key)}</span>
+                          <li key={k.id} className="flex items-center justify-between p-2.5 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-all">
+                            <div className="flex flex-col">
+                              <span className="font-mono text-xs text-slate-300">{maskApiKey(k.key)}</span>
+                              {activeApiKeyId === k.id && <span className="text-[10px] text-indigo-400 font-bold mt-0.5">Current Active Key</span>}
+                            </div>
                             <div className="flex items-center gap-2">
-                              {activeApiKeyId === k.id ? ( <span className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full"><CheckCircle className="w-3 h-3" /> Active</span> ) : ( <button onClick={() => handleSetActiveApiKey(k.id)} className="text-xs text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded-md transition-colors">Set Active</button> )}
-                              <button onClick={() => handleDeleteApiKey(k.id)} className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-700 hover:bg-slate-600 rounded-md transition-colors"><Trash2 className="w-3.5 h-3.5"/></button>
+                              {activeApiKeyId === k.id ? ( 
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20">
+                                  <CheckCircle className="w-3 h-3" /> Active
+                                </span> 
+                              ) : ( 
+                                <button 
+                                  onClick={() => handleSetActiveApiKey(k.id)} 
+                                  className="text-[10px] font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all border border-slate-700"
+                                >
+                                  Set Active
+                                </button> 
+                              )}
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(k.key);
+                                  setCopiedSection(`key-${k.id}`);
+                                  setTimeout(() => setCopiedSection(null), 2000);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-indigo-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700"
+                                title="Copy Key"
+                              >
+                                {copiedSection === `key-${k.id}` ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteApiKey(k.id)} 
+                                className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700"
+                                title="Delete Key"
+                              >
+                                <Trash2 className="w-3.5 h-3.5"/>
+                              </button>
                             </div>
                           </li>
                         ))}

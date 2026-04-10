@@ -10,11 +10,12 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
+    "@imgly/background-removal": "^1.7.0",
+    "jszip": "3.10.1",
+    "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@google/genai": "^1.30.0",
-    "lucide-react": "^0.554.0",
-    "jszip": "3.10.1",
     "react-image-crop": "^11.0.8"
   },
   "devDependencies": {

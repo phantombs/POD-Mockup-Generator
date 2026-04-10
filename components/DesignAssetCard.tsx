@@ -1,14 +1,15 @@
 import React from 'react';
-import { AlertCircle, RefreshCw, ZoomIn, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, ZoomIn, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
 import { DesignAsset } from '../types';
 
 interface DesignAssetCardProps {
   asset: DesignAsset;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  onRemoveBg?: (id: string) => void;
 }
 
-const DesignAssetCard: React.FC<DesignAssetCardProps> = ({ asset, isSelected, onSelect }) => {
+const DesignAssetCard: React.FC<DesignAssetCardProps> = ({ asset, isSelected, onSelect, onRemoveBg }) => {
   return (
     <div 
       className={`group relative bg-slate-800 rounded-xl overflow-hidden border-2 transition-all duration-300 cursor-pointer 
@@ -17,11 +18,11 @@ const DesignAssetCard: React.FC<DesignAssetCardProps> = ({ asset, isSelected, on
       onClick={() => onSelect(asset.id)}
     >
       <div className="aspect-square w-full relative bg-slate-900 flex items-center justify-center overflow-hidden">
-        {asset.loading ? (
+        {asset.loading || asset.isRemovingBg ? (
           <div className="flex flex-col items-center justify-center gap-3 text-center p-2">
             <div className="w-8 h-8 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
             <span className="text-indigo-400 text-xs font-medium animate-pulse">
-              {asset.strategy.title || 'Generating Concept...'}
+              {asset.isRemovingBg ? 'AI Removing Background...' : (asset.strategy.title || 'Generating Concept...')}
             </span>
           </div>
         ) : asset.error ? (
@@ -59,6 +60,22 @@ const DesignAssetCard: React.FC<DesignAssetCardProps> = ({ asset, isSelected, on
         </div>
         <p className="text-xs text-slate-400 truncate" title={asset.strategy.rationale}>{asset.strategy.rationale}</p>
       </div>
+
+      {isSelected && !asset.loading && !asset.isRemovingBg && asset.imageUrl && (
+        <div className="absolute top-2 left-2 z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveBg?.(asset.id);
+            }}
+            className="p-2 bg-slate-900/80 hover:bg-slate-900 text-indigo-400 rounded-lg backdrop-blur-sm border border-indigo-500/30 transition-all flex items-center gap-1.5 shadow-lg"
+            title="AI Remove Background"
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold">Remove BG</span>
+          </button>
+        </div>
+      )}
 
       {isSelected && (
         <div className="absolute inset-0 bg-indigo-500/20 pointer-events-none">

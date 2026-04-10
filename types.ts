@@ -62,6 +62,7 @@ export interface DesignAsset {
   id: string;
   imageUrl: string | null;
   loading: boolean;
+  isRemovingBg?: boolean;
   error: string | null;
   strategy: StrategySuggestion;
 }

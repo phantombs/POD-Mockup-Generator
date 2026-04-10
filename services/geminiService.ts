@@ -26,20 +26,23 @@ export const generateSloganSuggestions = async (audience: string, topic: string,
         Your expertise lies in identifying "micro-trends" before they go mainstream on platforms like Etsy US, Amazon Merch, Pinterest, and TikTok.
         
         **EXPERT ANALYSIS PROTOCOL:**
-        1. Marketplace Pulse: Search for bestsellers in the US.
+        1. Marketplace Pulse: Search for bestsellers in the US related to the topic.
         2. IP SAFETY CHECK: You MUST avoid any slogans related to Brands, Logos, Celebrities, or Trademarked Phrases.
         3. Evergreen Niche Focus: Prioritize Nature, Professions, Hobbies, and Original Humor.
         
         OUTPUT RULES:
         - slogan: Short, punchy, correctly spelled US English.
-        - rationale: Detailed expert analysis in Vietnamese.
-        - suggestedSearchTerm: Precise English query for US marketplaces.
-        - Return a JSON array of objects.`,
+        - rationale: Detailed expert analysis in Vietnamese explaining why this will sell.
+        - suggestedSearchTerm: Precise English query for US marketplaces to see competition.
+        - traffic: Estimated search volume (High, Medium, Low).
+        - conversionRate: Estimated potential (e.g. 3.5%).
+        - Return a JSON array of up to 10 objects.`,
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
+          maxItems: 10,
           items: {
             type: Type.OBJECT,
             properties: {
